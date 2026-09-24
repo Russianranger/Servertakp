@@ -452,20 +452,11 @@ void Client::SendLogoutReply()
 	FastQueuePacket(&reply);
 }
 
-void Client::SendCancelTrade(Mob* with) {
-
-	auto outapp = new EQApplicationPacket(OP_CancelTrade, sizeof(CancelTrade_Struct));
-	CancelTrade_Struct* ct = (CancelTrade_Struct*) outapp->pBuffer;
-	ct->target = with->GetID();
-	ct->source = 0;
-	FastQueuePacket(&outapp);
-
-	outapp = new EQApplicationPacket(OP_TradeReset, 0);
-	QueuePacket(outapp);
-	safe_delete(outapp);
-
-	FinishTrade(this);
-	trade->Reset();
+void Client::SendCancelTrade(Mob* with)
+{
+	CancelTradeSession(with ? with->GetID() : 0);
+	EQApplicationPacket reset(OP_TradeReset, 0);
+	QueuePacket(&reset);
 }
 
 void Client::ReportConnectingState() {
@@ -3367,23 +3358,8 @@ void Client::LinkDead()
 	ClearPendingZoneTransfer();
 	CloseStream(RDPConnectionDisposition::Linkdead, 0);
 
-	Mob *trade_partner = trade->With();
-	if (trade_partner)
-	{
-		LogTrading("Canceling trade with [{}] due to linkdead.", trade_partner->GetName());
-
-		if (trade_partner->IsClient())
-		{
-			trade_partner->CastToClient()->SendCancelTrade(this);
-		}
-		else
-		{
-			trade_partner->trade->Reset();
-		}
-
-		FinishTrade(this);
-		trade->Reset();
-	}
+	CancelTradeSession(GetID(), false);
+	CancelPendingTradeRequests();
 
 	uint16 corpse_id = IsLooting();
 	if (corpse_id != 0)

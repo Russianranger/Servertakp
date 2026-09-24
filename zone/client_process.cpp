@@ -657,19 +657,8 @@ void Client::FinishRemoval()
 {
 	CloseTraderSession();
 
-	Mob *Other = trade->With();
-	if(Other)
-	{
-		LogTradingDetail("Client disconnected during a trade. Returning their items.");
-		FinishTrade(this);
-
-		if(Other->IsClient())
-			Other->CastToClient()->FinishTrade(Other);
-
-		/* Reset both sides of the trade */
-		trade->Reset();
-		Other->trade->Reset();
-	}
+	CancelTradeSession(GetID(), false);
+	CancelPendingTradeRequests();
 
 	database.SetFirstLogon(CharacterID(), 0); //We change firstlogon status regardless of if a player logs out to zone or not, because we only want to trigger it on their first login from world.
 
@@ -1336,13 +1325,14 @@ static uint64 CoinTypeCoppers(uint32 type) {
 
 void Client::OPMoveCoin(const EQApplicationPacket* app)
 {
-	MoveMoney_Struct* mc = (MoveMoney_Struct*)app->pBuffer;
-	uint64 value = 0, amount_to_take = 0, amount_to_add = 0;
+	const auto mc = reinterpret_cast<const MoveMoney_Struct*>(app->pBuffer);
+	uint64 amount_to_take = 0, amount_to_add = 0;
 	int32 *from_bucket = 0, *to_bucket = 0;
 	Mob* trader = trade->With();
 
-	// if amount < 0, client is sending a malicious packet
-	if (mc->amt < 0)
+	// Only -1 is intentional destruction. An unknown destination must not debit.
+	if (mc->amt <= 0 || mc->from < 0 || mc->from > 2 || mc->to < -1 || mc->to > 3 ||
+		(mc->to == 3 && trade->state == TradeCompleting))
 	{
 		return;
 	}
@@ -1522,7 +1512,7 @@ void Client::OPMoveCoin(const EQApplicationPacket* app)
 		}
 	}
 
-	if(!from_bucket)
+	if(!from_bucket || *from_bucket < 0 || from_bucket == to_bucket)
 	{
 		return;
 	}
@@ -1546,55 +1536,35 @@ void Client::OPMoveCoin(const EQApplicationPacket* app)
 	// and an amount_to_add
 
 	if (amount_to_take > *from_bucket) {
-		// we have a chance to go negative
-		// something went wrong
-		FinishTrade(this);
-		trade->Reset();
-		auto canceltrade = new EQApplicationPacket(OP_CancelTrade, sizeof(CancelTrade_Struct));
-		CancelTrade_Struct* ct = (CancelTrade_Struct*)canceltrade->pBuffer;
-		ct->target = 0;
-		ct->source = 0;
-		FastQueuePacket(&canceltrade);
+		CancelTradeSession(0);
 		Kick();
 		return;
 	}
 	if (to_bucket)
 	{
 		uint64 new_total = *to_bucket + amount_to_add;
-		if (new_total > INT_MAX) {
-			// overflow - dont want this to happen either
-			FinishTrade(this);
-			trade->Reset();
-			auto canceltrade = new EQApplicationPacket(OP_CancelTrade, sizeof(CancelTrade_Struct));
-			CancelTrade_Struct* ct = (CancelTrade_Struct*)canceltrade->pBuffer;
-			ct->target = 0;
-			ct->source = 0;
-			FastQueuePacket(&canceltrade);
+		if (*to_bucket < 0 || new_total > INT_MAX) {
+			// The client already changed its local buckets and overflowed, we kick so they reconnect with repaired values.
+			CancelTradeSession(0);
 			Kick();
 			return;
 		}
 	}
-	// now we actually take it from the from bucket. if there's an error
-	// with the destination slot, they lose their money
-	*from_bucket -= amount_to_take;
-	// why are intentionally inducing a crash here rather than letting the code attempt to stumble on?
-	// assert(*from_bucket >= 0);
+	if (!amount_to_add)
+		return;
+	*from_bucket -= static_cast<int32>(amount_to_take);
 
 	if(to_bucket)
 	{
-		if(*to_bucket + amount_to_add > *to_bucket)	// overflow check
-			*to_bucket += amount_to_add;
+		*to_bucket += static_cast<int32>(amount_to_add);
 	}
 
-	if(mc->to == 3 && !trader) {
-		// if we got here, then we have an issue with the trade
-		FinishTrade(this);
-		trade->Reset();
-		auto canceltrade = new EQApplicationPacket(OP_CancelTrade, sizeof(CancelTrade_Struct));
-		CancelTrade_Struct* ct = (CancelTrade_Struct*) canceltrade->pBuffer;
-		ct->target = 0;
-		ct->source = 0;
-		FastQueuePacket(&canceltrade);
+	if(mc->to == 3 && (!trade->IsActiveWith(trader) || (trader->IsNPC() && trader->IsEngaged()))) {
+		// reconcile a client side deposit racing with closure.
+		CancelTradeSession(0);
+		SaveCurrency();
+		RecalcWeight();
+		return;
 	}
 
 	// if this is a trade move, inform the person being traded with

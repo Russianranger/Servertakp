@@ -1282,16 +1282,8 @@ bool Client::Death(Mob* killerMob, int32 damage, uint16 spell, EQ::skills::Skill
 	// We're in the middle of a trade and are not leaving a corpse.
 	if (trade && (GetGM() || !RuleB(Character, LeaveCorpses) || GetLevel() < RuleI(Character, DeathItemLossLevel)))
 	{
-		Mob *with = trade->With();
-		if (with && with->IsClient()) 
-		{
-			LogTrading("Canceling trade with [{}] due to death.", with->GetName());
-			FinishTrade(this);
-			trade->Reset();
-
-			with->CastToClient()->FinishTrade(with);
-			with->trade->Reset();
-		}
+		CancelTradeSession(GetID(), false);
+		CancelPendingTradeRequests();
 	}
 
 	int exploss = 0;

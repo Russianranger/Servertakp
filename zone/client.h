@@ -298,6 +298,10 @@ public:
 		bool finalizer = false,
 		void *event_entry = nullptr
 	);
+	void	RefundOwnTrade();
+	void	CancelTradeSession(uint16 cancelled_by_id, bool notify_self = true);
+	void	CancelPendingTradeRequests();
+	bool	CanReceiveTradeMoney(const Trade& offer) const;
 	void	SendZonePoints();
 
 	void FillSpawnStruct(NewSpawn_Struct* ns, Mob* ForWho);

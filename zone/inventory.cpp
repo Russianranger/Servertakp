@@ -1015,7 +1015,8 @@ bool Client::IsBankSlot(uint32 slot)
 // In the future, this can be optimized by pushing all changes through one database REPLACE call
 bool Client::SwapItem(MoveItem_Struct* move_in) {
 	if (move_in->from < 0 || !IsValidSlot(move_in->from) || !IsValidSlot(move_in->to) ||
-		(move_in->qty < 0 && move_in->to != INVALID_INDEX))
+		(move_in->qty < 0 && move_in->to != INVALID_INDEX) ||
+		(move_in->from >= EQ::invslot::TRADE_BEGIN && move_in->from <= EQ::invslot::TRADE_END))
 		return false;
 
 	uint32 src_slot_check = move_in->from;
@@ -1304,13 +1305,15 @@ bool Client::SwapItem(MoveItem_Struct* move_in) {
 
 	// Step 4: Check for entity trade
 	if (dst_slot_id >= EQ::invslot::TRADE_BEGIN && dst_slot_id <= EQ::invslot::TRADE_END) {
+		if (trade->state == TradeCompleting)
+			return false;
 		if (src_slot_id != EQ::invslot::slotCursor) {
 			Kick();
 			std::string error = "Trading item not on cursor.";
 			LogInventory("Trading item not on cursor.");
 			return false;
 		}
-		if (with && trade->state != TradeNone && trade->state != Requesting) 
+		if (trade->IsActiveWith(with))
 		{
 			LogInventoryDetail("Trade item move from slot [{}] to slot [{}] (trade with [{}])", src_slot_id, dst_slot_id, with->GetName());
 			// Fill Trade list with items from cursor
@@ -1336,49 +1339,9 @@ bool Client::SwapItem(MoveItem_Struct* move_in) {
 
 			return true;
 		} else {
-			if (src_inst) {
-				int new_charges = 0;
-				if (!dst_inst) {
-					// Move item on cursor to the trade slots
-					PutItemInInventory(dst_slot_id, *src_inst);
-				}
-				else
-				{
-					new_charges = (dst_inst->GetCharges()+src_inst->GetCharges());
-					if (new_charges < EQMAC_STACKSIZE)
-					{
-						dst_inst->SetCharges(new_charges);
-						new_charges = 0;
-					}
-					else
-					{
-						new_charges = src_inst->GetCharges()-(EQMAC_STACKSIZE -dst_inst->GetCharges()); //Leftover charges = charges - difference
-						dst_inst->SetCharges(EQMAC_STACKSIZE);
-					}
-
-				}
-				if (new_charges > 0)
-					GetInv().GetItem(src_slot_id)->SetCharges(new_charges);
-				else
-					DeleteItemInInventory(src_slot_id);
-			}
-
-			// now close out anything else associated with trade
-			FinishTrade(this);
-			auto canceltrade = new EQApplicationPacket(OP_CancelTrade, sizeof(CancelTrade_Struct));
-			CancelTrade_Struct* ct = (CancelTrade_Struct*) canceltrade->pBuffer;
-			ct->target = 0;
-			ct->source = 0;
-			if (with && with->IsClient()) {
-				with->CastToClient()->QueuePacket(canceltrade);
-				with->CastToClient()->FinishTrade(with);
-				with->CastToClient()->trade->Reset();
-			}
-			FastQueuePacket(&canceltrade);
-			trade->Reset();
-
-			// SummonItem(src_inst->GetID(), src_inst->GetCharges());
-			// DeleteItemInInventory(SlotCursor);
+			// The client has already changed its cursor but we're desynced and don't want to merge unrelated items into one stack so we kick instead.
+			CancelTradeSession(0);
+			Kick("Trade changed during item movement; reconnect to resynchronize inventory.");
 
 			return true;
 		}

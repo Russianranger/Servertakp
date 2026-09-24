@@ -431,9 +431,8 @@ Mob::~Mob()
 
 	if(trade) {
 		Mob *with = trade->With();
-		if(with && with->IsClient()) {
-			with->CastToClient()->FinishTrade(with);
-			with->trade->Reset();
+		if(with && with != this && with->IsClient() && with->trade->GetWithID() == GetID()) {
+			with->CastToClient()->SendCancelTrade(this);
 		}
 		safe_delete(trade);
 	}
