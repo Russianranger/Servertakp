@@ -440,8 +440,8 @@ void Client::SendLogoutPackets()
 {
 	auto outapp = new EQApplicationPacket(OP_CancelTrade, sizeof(CancelTrade_Struct));
 	auto cancel = reinterpret_cast<CancelTrade_Struct *>(outapp->pBuffer);
-	cancel->fromid = GetID();
-	cancel->action = groupActUpdate;
+	cancel->target = GetID();
+	cancel->source = 0;
 	FastQueuePacket(&outapp);
 }
 
@@ -456,7 +456,8 @@ void Client::SendCancelTrade(Mob* with) {
 
 	auto outapp = new EQApplicationPacket(OP_CancelTrade, sizeof(CancelTrade_Struct));
 	CancelTrade_Struct* ct = (CancelTrade_Struct*) outapp->pBuffer;
-	ct->fromid = with->GetID();
+	ct->target = with->GetID();
+	ct->source = 0;
 	FastQueuePacket(&outapp);
 
 	outapp = new EQApplicationPacket(OP_TradeReset, 0);
@@ -2137,10 +2138,10 @@ void Client::QuestReadBook(const char* text, uint8 type) {
 }
 
 void Client::SendClientMoneyUpdate(uint8 type,uint32 amount){
-	auto outapp = new EQApplicationPacket(OP_TradeMoneyUpdate, sizeof(TradeMoneyUpdate_Struct));
-	TradeMoneyUpdate_Struct* mus= (TradeMoneyUpdate_Struct*)outapp->pBuffer;
-	mus->amount=amount;
-	mus->trader=0;
+	auto outapp = new EQApplicationPacket(OP_TradeMoneyUpdate, sizeof(TradeMoney_Struct));
+	TradeMoney_Struct* mus= (TradeMoney_Struct*)outapp->pBuffer;
+	mus->amt=amount;
+	mus->id=0;
 	mus->type=type;
 	QueuePacket(outapp);
 	safe_delete(outapp);
@@ -2826,9 +2827,9 @@ bool Client::BindWound(uint16 bindmob_id, bool start, bool fail)
 					// delete item on cursor in client
 					auto app = new EQApplicationPacket(OP_DeleteCharge, sizeof(MoveItem_Struct));
 					MoveItem_Struct* delitem = (MoveItem_Struct*)app->pBuffer;
-					delitem->from_slot = EQ::invslot::slotCursor;
-					delitem->to_slot = 0xFFFFFFFF;
-					delitem->number_in_stack = 0xFFFFFFFF;
+					delitem->from = EQ::invslot::slotCursor;
+					delitem->to = -1;
+					delitem->qty = -1;
 					QueuePacket(app);
 					safe_delete(app);
 					// send to client new cursor item with updated charges.
