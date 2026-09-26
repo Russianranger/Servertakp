@@ -3532,27 +3532,7 @@ void Client::Sacrifice(Mob *caster)
 
 	if(GetLevel() >= RuleI(Spells, SacrificeMinLevel) && GetLevel() <= RuleI(Spells, SacrificeMaxLevel)){
 		
-		float loss;
-		uint8 level = GetLevel();
-		if (level >= 1 && level <= 30)
-			loss = 0.08f;
-		if (level >= 31 && level <= 35)
-			loss = 0.075f;
-		if (level >= 36 && level <= 40)
-			loss = 0.07f;
-		if (level >= 41 && level <= 45)
-			loss = 0.065f;
-		if (level >= 46 && level <= 58)
-			loss = 0.06f;
-		if (level == 59)
-			loss = 0.05f;
-		if (level == 60)
-			loss = 0.16f;
-		if (level >= 61)
-			loss = 0.07f;
-
-		int requiredxp = GetEXPForLevel(level + 1) - GetEXPForLevel(level);
-		int exploss = (int)((float)requiredxp * (loss * RuleR(Character, EXPLossMultiplier)));
+		int exploss = CalcExpLoss();
 
 		if(exploss < GetEXP()){
 			SetEXP(GetEXP()-exploss, GetAAXP());

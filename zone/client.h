@@ -560,6 +560,7 @@ public:
 	void	AddLevelBasedExp(uint8 exp_percentage, uint8 max_level=0);
 	void	InspectBuffs(Client* Inspector, int Rank);
 	virtual void SetLevel(uint8 set_level, bool command = false);
+	int		CalcExpLoss();
 	void	GetExpLoss(Mob* attacker, uint16 spell, int &exploss, uint8 killedby = 0);
 	uint32  GetEXPForLevel(uint16 level, bool aa = false);
 	bool	IsInExpRange(Mob* defender);
