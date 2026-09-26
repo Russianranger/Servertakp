@@ -2437,8 +2437,8 @@ void Mob::DamageShield(Mob* attacker, bool spell_ds) {
 		cds->target = targetid;
 		cds->source = GetID();
 		cds->type = spellbonuses.DamageShieldType;
-		cds->spellid = spellid;
-		cds->damage = DS;
+		cds->spellid = SPELL_UNKNOWN;
+		cds->damage = DS; // this should be inverted as seen in packet captures but needs the ordering changed to avoid double subtracting on the client side
 
 		if (attacker && !attacker->HasDied())
 		{

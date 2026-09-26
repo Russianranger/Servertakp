@@ -381,12 +381,15 @@ struct Charm_Struct
 	/*006*/
 };
 
-struct InterruptCast_Struct
+// MSG_TOKEN_TEXT (0x4235), original client type: tokenStringMsg.
+struct TokenText_Struct
 {
-	uint16 messageid;
-	uint16 color;
-	char	message[0];
+	/*00*/ int16 string_token; // Original type: short
+	/*02*/ int16 string_color; // Chat type/color
+	/*04*/ int16 fromWorld;    // 1 selects world; otherwise zone
 };
+static_assert(sizeof(TokenText_Struct) == 6);
+static_assert(offsetof(TokenText_Struct, fromWorld) == 4);
 
 struct DeleteSpell_Struct
 {
@@ -1826,12 +1829,31 @@ struct SetDataRate_Struct {
 	float newdatarate;
 };
 
-//OP_SetServerFilter
-struct SetServerFilter_Struct 
+// OP_SetServerFilter / MSG_UPDATE_FILTERS (0x41FF), original type: updateFilters.
+// These wire fields are independent of the server's eqFilterType indices.
+struct UpdateFilters_Struct
 {
-	/*000*/	uint32 filters[17];	// Comment: 
-	/*068*/	
+	/*00*/ int32 dmgshields;     // 0 On, 1 Off
+	/*04*/ int32 npcspells;      // 0 On, 1 Off
+	/*08*/ int32 pcspells;       // 0 All, 1 Off, 2 Group
+	/*12*/ int32 bardsongs;      // 0 All, 1 Me, 2 Group, 3 Off
+	/*16*/ int32 server_filter;  // 0 Off, 1 On; independent master request
+	/*20*/ int32 guild_chat;     // The following ten fields: 0 Off, 1 On
+	/*24*/ int32 socials;
+	/*28*/ int32 group_chat;
+	/*32*/ int32 shouts;
+	/*36*/ int32 auctions;
+	/*40*/ int32 oocs;
+	/*44*/ int32 my_misses;
+	/*48*/ int32 other_miss;
+	/*52*/ int32 other_hit;
+	/*56*/ int32 atk_miss_me;
+	/*60*/ int32 criticalspells; // 0 All, 1 Me, 2 Off
+	/*64*/ int32 criticalmelee;  // 0 All, 1 Me, 2 Off
 };
+static_assert(sizeof(UpdateFilters_Struct) == 68);
+static_assert(offsetof(UpdateFilters_Struct, server_filter) == 16);
+static_assert(offsetof(UpdateFilters_Struct, criticalmelee) == 64);
 
 struct GMName_Struct {
 	char oldname[64];
@@ -2370,6 +2392,14 @@ struct MoneyUpdate_Struct
 	int32 silver;
 	int32 copper;
 };
+
+// Mac-family 0x4241: the client filters this text using entity_id.
+struct SpellTextMessageStringID_Struct {
+	uint16 entity_id;
+	uint32 string_id;
+	char message[0]; // NUL-terminated substitution argument
+};
+static_assert(sizeof(SpellTextMessageStringID_Struct) == 6, "Spell text header must be six bytes");
 
 struct FormattedMessage_Struct{
 	uint16	unknown0;

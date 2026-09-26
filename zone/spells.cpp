@@ -1009,11 +1009,12 @@ void Mob::InterruptSpell(uint16 message, uint16 color, uint16 spellid, bool fizz
 			// when we use InterruptSpell()'s overload above, this functions is called with SONG_ENDS_ABRUPTLY but this also creates an extra message
 			if (message && message != StringID::SONG_ENDS && message != StringID::SONG_ENDS_ABRUPTLY)
 			{
-				// the interrupt message
-				auto outapp = new EQApplicationPacket(OP_InterruptCast, sizeof(InterruptCast_Struct));
-				InterruptCast_Struct *ic = (InterruptCast_Struct *)outapp->pBuffer;
-				ic->messageid = message;
-				ic->color = color;
+				// Display the selected message; casting state is updated separately.
+				auto outapp = new EQApplicationPacket(OP_TokenText, sizeof(TokenText_Struct));
+				TokenText_Struct *text = (TokenText_Struct *)outapp->pBuffer;
+				text->string_token = static_cast<int16>(message);
+				text->string_color = static_cast<int16>(color);
+				text->fromWorld = 0;
 				outapp->priority = 5;
 				CastToClient()->QueuePacket(outapp);
 				safe_delete(outapp);
@@ -1033,11 +1034,9 @@ void Mob::InterruptSpell(uint16 message, uint16 color, uint16 spellid, bool fizz
 			{
 			case StringID::SONG_ENDS:
 				message_other = StringID::SONG_ENDS_OTHER;
-				color = Chat::Spells;
 				break;
 			case StringID::SONG_ENDS_ABRUPTLY:
 				message_other = StringID::SONG_ENDS_ABRUPTLY_OTHER;
-				color = Chat::Spells;
 				break;
 			case StringID::MISS_NOTE:
 				message_other = StringID::MISSED_NOTE_OTHER;
@@ -1055,16 +1054,14 @@ void Mob::InterruptSpell(uint16 message, uint16 color, uint16 spellid, bool fizz
 				if (IsValidSpell(spellid) && GetClass() == Class::Bard && IsBardSong(spellid))
 				{
 					message_other = StringID::SONG_ENDS_ABRUPTLY_OTHER;
-					color = Chat::Spells;
 				}
 				break;
 			default:
 				message_other = StringID::INTERRUPT_SPELL_OTHER;
-				color = Chat::Spells;
 			}
 
 			if (message_other > 0)
-				entity_list.MessageClose_StringID(this, true, 200, color, message_other, this->GetCleanName());
+				entity_list.SpellTextMessageClose_StringID(this, true, 200, message_other, this->GetCleanName());
 		}
 	}
 }
@@ -1256,8 +1253,7 @@ void Mob::CastedSpellFinished(uint16 spell_id, uint32 target_id, CastingSlot slo
 			if (regain_conc)
 			{
 				Message_StringID(Chat::Spells, StringID::REGAIN_AND_CONTINUE);
-				uint16 textcolor = IsNPC() ? Chat::DefaultText : Chat::Spells;
-				entity_list.MessageClose_StringID(this, true, 200, textcolor, StringID::OTHER_REGAIN_CAST, this->GetCleanName());
+				entity_list.SpellTextMessageClose_StringID(this, true, 200, StringID::OTHER_REGAIN_CAST, this->GetCleanName());
 			}
 		}		// mob was hit or moved from start of cast loc
 	}		// class != bard
@@ -2685,7 +2681,7 @@ bool Mob::SpellOnTarget(uint16 spell_id, Mob* spelltar, bool reflect, bool use_r
 		}
 
 		// send to people in the area, ignoring caster and target
-		entity_list.QueueCloseClients(spelltar, action_packet, true, RuleI(Range, SpellAnims), this, false, FilterNone);
+		entity_list.QueueCloseClients(spelltar, action_packet, true, RuleI(Range, SpellAnims), this, true, FilterNone);
 	}
 	else {
 		Message(Chat::Disciplines, "%s", spells[spell_id].cast_on_you);
@@ -4836,7 +4832,7 @@ void Client::SendSpellAnim(uint16 targetid, uint16 spell_id)
 	a->sequence = 231;
 
 	app.priority = 1;
-	entity_list.QueueCloseClients(this, &app, false, RuleI(Range, SpellAnims), 0, false);
+	entity_list.QueueCloseClients(this, &app, false, RuleI(Range, SpellAnims), 0, true);
 }
 
 bool Mob::IsBuffed()

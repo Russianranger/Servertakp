@@ -821,13 +821,16 @@ void Client::Handle_Connect_OP_SetDataRate(const EQApplicationPacket *app)
 
 void Client::Handle_Connect_OP_SetServerFilter(const EQApplicationPacket *app)
 {
-	if (app->size != sizeof(SetServerFilter_Struct)) {
+	if (app->size != sizeof(UpdateFilters_Struct)) {
 		LogError("Received invalid sized OP_SetServerFilter");
 		DumpPacket(app);
 		return;
 	}
-	SetServerFilter_Struct* filter = (SetServerFilter_Struct*)app->pBuffer;
-	ServerFilter(filter);
+	UpdateFilters_Struct filters;
+	memcpy(&filters, app->pBuffer, sizeof(filters));
+	// server side filters disabled for now, even if client requests it
+	filters.server_filter = 0;
+	ServerFilter(&filters);
 	return;
 }
 
@@ -1887,7 +1890,7 @@ void Client::Handle_OP_Animation(const EQApplicationPacket *app)
 		// relay the packet but don't send it back to the client that sent it
 		// they don't expect their own anim to be echoed and they already played the animation track when sending this to us
 		// this client requested animation is used for socials and the intimidation skill
-		entity_list.QueueCloseClients(this, app, true, RuleI(Range, Anims), 0, false, eqFilterType::FilterNone);
+		entity_list.QueueCloseClients(this, app, true, RuleI(Range, Anims), 0, true, eqFilterType::FilterNone);
 	}
 }
 
@@ -3711,10 +3714,11 @@ void Client::Handle_OP_Discipline(const EQApplicationPacket *app)
 		else
 		{
 			LogDiscs("No disc used and reuse time is met.");
-			auto outapp = new EQApplicationPacket(OP_InterruptCast, sizeof(InterruptCast_Struct));
-			InterruptCast_Struct* ic = (InterruptCast_Struct*)outapp->pBuffer;
-			ic->messageid = StringID::DISCIPLINE_RDY;
-			ic->color = Chat::Disciplines;
+			auto outapp = new EQApplicationPacket(OP_TokenText, sizeof(TokenText_Struct));
+			TokenText_Struct* text = (TokenText_Struct*)outapp->pBuffer;
+			text->string_token = StringID::DISCIPLINE_RDY;
+			text->string_color = Chat::Disciplines;
+			text->fromWorld = 0;
 			QueuePacket(outapp);
 			safe_delete(outapp);
 		}
@@ -7087,13 +7091,16 @@ void Client::Handle_OP_SetRunMode(const EQApplicationPacket *app)
 void Client::Handle_OP_SetServerFilter(const EQApplicationPacket *app)
 {
 
-	if (app->size != sizeof(SetServerFilter_Struct)) {
-		LogError("Received invalid sized OP_SetServerFilter: got [{}], expected [{}]", app->size, sizeof(SetServerFilter_Struct));
+	if (app->size != sizeof(UpdateFilters_Struct)) {
+		LogError("Received invalid sized OP_SetServerFilter: got [{}], expected [{}]", app->size, sizeof(UpdateFilters_Struct));
 		DumpPacket(app);
 		return;
 	}
-	SetServerFilter_Struct* filter = (SetServerFilter_Struct*)app->pBuffer;
-	ServerFilter(filter);
+	UpdateFilters_Struct filters;
+	memcpy(&filters, app->pBuffer, sizeof(filters));
+	// server side filters disabled for now, even if client requests it
+	filters.server_filter = 0;
+	ServerFilter(&filters);
 	return;
 }
 
