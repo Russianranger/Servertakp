@@ -354,13 +354,13 @@ void Client::AddEXP(uint32 in_add_exp, uint8 conlevel, Mob* killed_mob, int16 av
 		// Race modifiers apply to AA exp if AA exp is split
 		if (RuleB(AlKabor, RaceEffectsAASplit) && m_epp.perAA > 0 && m_epp.perAA < 100)
 		{
-			if (GetRace() == Race::Halfling)
+			if (GetBaseRace() == Race::Halfling)
 				race_mult = 1.05f;
-			else if (GetRace() == Race::Barbarian)
+			else if (GetBaseRace() == Race::Barbarian)
 				race_mult = 0.95f;
-			else if (GetRace() == Race::Ogre)
+			else if (GetBaseRace() == Race::Ogre)
 				race_mult = 0.85f;
-			else if (GetRace() == Race::Troll || GetRace() == Race::Iksar)
+			else if (GetBaseRace() == Race::Troll || GetBaseRace() == Race::Iksar)
 				race_mult = 0.8f;
 		}
 
