@@ -650,23 +650,29 @@ bool Mob::DoPreCastingChecks(uint16 spell_id, CastingSlot slot, uint16 spell_tar
 	return true;
 }
 
-uint16 Mob::GetSpecializeSkillValue(uint16 spell_id) const {
-	switch(spells[spell_id].skill) {
+static EQ::skills::SkillType GetSpecializationSkill(EQ::skills::SkillType skill)
+{
+	switch (skill)
+	{
 	case EQ::skills::SkillAbjuration:
-		return(GetSkill(EQ::skills::SkillSpecializeAbjure));
+		return EQ::skills::SkillSpecializeAbjure;
 	case EQ::skills::SkillAlteration:
-		return(GetSkill(EQ::skills::SkillSpecializeAlteration));
+		return EQ::skills::SkillSpecializeAlteration;
 	case EQ::skills::SkillConjuration:
-		return(GetSkill(EQ::skills::SkillSpecializeConjuration));
+		return EQ::skills::SkillSpecializeConjuration;
 	case EQ::skills::SkillDivination:
-		return(GetSkill(EQ::skills::SkillSpecializeDivination));
+		return EQ::skills::SkillSpecializeDivination;
 	case EQ::skills::SkillEvocation:
-		return(GetSkill(EQ::skills::SkillSpecializeEvocation));
+		return EQ::skills::SkillSpecializeEvocation;
 	default:
-		//wtf...
-		break;
+		return EQ::skills::SkillCount;
 	}
-	return(0);
+}
+
+uint16 Mob::GetSpecializeSkillValue(uint16 spell_id) const
+{
+	const auto skill = GetSpecializationSkill(spells[spell_id].skill);
+	return skill != EQ::skills::SkillCount ? GetSkill(skill) : 0;
 }
 
 void Client::CheckSpecializeIncrease(uint16 spell_id) {
@@ -778,6 +784,28 @@ bool Mob::CheckFizzle(uint16 spell_id)
 	return(true);
 }
 
+static uint16 GetAvailableCastingSkill(const Client &client, EQ::skills::SkillType skill)
+{
+	const uint32 raw_skill = client.GetRawSkill(skill);
+	if (raw_skill > 253)
+	{
+		return 0;
+	}
+
+	int effective_level = client.GetLevel();
+	if (effective_level < client.GetLevel2())
+	{
+		effective_level = std::min<int>(client.GetLevel2(), effective_level + 2);
+	}
+	if (client.MaxSkill(skill, client.GetClass(), effective_level) == 0)
+	{
+		return 0;
+	}
+
+	// An available untrained skill contributes 1; worn modifiers do not enter this value.
+	return raw_skill > 0 ? raw_skill : 1;
+}
+
 bool Client::CheckFizzle(uint16 spell_id)
 {
 	// GMs don't fizzle
@@ -859,11 +887,12 @@ bool Client::CheckFizzle(uint16 spell_id)
 		int effectiveSpellLevel = spellLevel - 1;
 		effectiveSpellLevel = effectiveSpellLevel > 50 ? 50 : effectiveSpellLevel;
 
-		// spellCastingSkill is going to be 235 for everyone except while leveling up
-		int spellCastingSkill = GetSkill(spells[spell_id].skill);
-
-		effectiveSpellCastingSkill = spellCastingSkill + spellCastingSkillTotalEffects;
-		effectiveSpellCastingSkill = effectiveSpellCastingSkill < 0 ? 0 : effectiveSpellCastingSkill;
+		if (GetAvailableCastingSkill(*this, spells[spell_id].skill) != 0)
+		{
+			// Fizzle uses the modified skill after the separate availability gate.
+			const int spellCastingSkill = GetSkill(spells[spell_id].skill);
+			effectiveSpellCastingSkill = std::max(0, spellCastingSkill + spellCastingSkillTotalEffects);
+		}
 
 		// up to a 10% penalty is added randomly to the chance calculation
 		randomPenalty = zone->random.Int(0, 10);
@@ -901,9 +930,13 @@ bool Client::CheckFizzle(uint16 spell_id)
 	int specializeSkill = GetSpecializeSkillValue(spell_id);
 	int specializeAdjustment = 0;
 	int spellCastingMasteryAdjustment = 0;
-	if (specializeSkill > 0)
+	if (GetSpecializationSkill(spells[spell_id].skill) != EQ::skills::SkillCount)
 	{
-		specializeAdjustment = specializeSkill / 10 + 1; // 200 skill = 21, 50 skill = 6 - these are directly added to the chance and help succeed
+		// 252 is a valid skill value but the fizzle formula excludes it
+		if (specializeSkill > 0 && specializeSkill < 252)
+		{
+			specializeAdjustment = specializeSkill / 10 + 1;
+		}
 
 		int spellCastingMasteryLevel = GetAA(aaSpellCastingMastery);
 		switch (spellCastingMasteryLevel)
@@ -913,7 +946,6 @@ bool Client::CheckFizzle(uint16 spell_id)
 		case 3: spellCastingMasteryAdjustment = 10; break;
 		}
 
-		// with specialization you can get 98 chance instead of 95
 		cappedChance = cappedChance + specializeAdjustment + spellCastingMasteryAdjustment;
 		cappedChance = cappedChance > 98 ? 98 : cappedChance;
 	}
@@ -1066,6 +1098,110 @@ void Mob::InterruptSpell(uint16 message, uint16 color, uint16 spellid, bool fizz
 	}
 }
 
+// IsRoguePoison also covers triggered spells and innate abilities.
+// Ant Legs seems to have been included by accident - it makes Bracelet of the Shadow Hive castable while moving.
+static bool IsRoguePoison(uint16 spell_id)
+{
+	switch (spell_id)
+	{
+	case 87: // Lay on Hands
+	case 88: // Harm Touch
+	case 476: // VampiricEmbraceEffect
+	case 760: // Weakening Poison I
+	case 761: // Contact Poison I
+	case 762: // Muscle Lock I
+	case 763: // System Shock I
+	case 764: // Feeble Mind I
+	case 765: // Injected Poison I
+	case 766: // Dizzy I
+	case 767: // Liquid Silver I
+	case 768: // Lower Resists I
+	case 821: // VampEmbraceNecro
+	case 822: // VampEmbraceShadow
+	case 823: // Divine Might Effect
+	case 1465: // CallOfSkyEffect
+	case 1466: // Cloud of Silence
+	case 1467: // CallOfFireEffect
+	case 1471: // ShroudOfDeathEffect
+	case 1832: // Blinding Poison I
+	case 1833: // Paralyzing Poison I
+	case 1834: // Poison Animal I
+	case 1835: // Poison Summoned I
+	case 1836: // Berserker Madness I
+	case 1837: // Flesh Rot I
+	case 1838: // Brittle Haste I
+	case 1839: // Blinding Poison II
+	case 1840: // Blinding Poison III
+	case 1841: // Paralyzing Poison II
+	case 1842: // Paralyzing Poison III
+	case 1843: // Poison Animal II
+	case 1844: // Poison Animal III
+	case 1845: // Poison Summoned II
+	case 1846: // Poison Summoned III
+	case 1847: // Flesh Rot II
+	case 1848: // Flesh Rot III
+	case 1849: // Brittle Haste II
+	case 1850: // Brittle Haste III
+	case 1851: // Weakening Poison II
+	case 1852: // Weakening Poison III
+	case 1853: // Contact Poison II
+	case 1854: // Contact Poison III
+	case 1855: // Contact Poison IV
+	case 1856: // Muscle Lock II
+	case 1857: // Muscle Lock III
+	case 1858: // Berserker Madness II
+	case 1859: // Berserker Madness III
+	case 1860: // System Shock II
+	case 1861: // System Shock III
+	case 1862: // System Shock IV
+	case 1863: // Feeble Mind II
+	case 1864: // Feeble Mind III
+	case 1865: // Injected Poison II
+	case 1866: // Injected Poison III
+	case 1867: // Injected Poison IV
+	case 1868: // Dizzy II
+	case 1869: // Dizzy III
+	case 1870: // Liquid Silver II
+	case 1871: // Liquid Silver III
+	case 1872: // Lower Resists II
+	case 1873: // Lower Resists III
+	case 1874: // Ant Legs (Bracelet of the Shadow Hive, shaman shrink potions)
+	case 1875: // Muscle Lock IV
+	case 1876: // Feeble Mind IV
+	case 1877: // Lower Resists IV
+	case 1878: // Weakening Poison IV
+	case 1879: // Berserker Madness IV
+	case 1880: // Brittle Haste IV
+	case 1881: // System Shock V
+	case 1882: // Dizzy IV
+	case 1883: // Injected Poison V
+	case 1965: // LifetapEffectNormal
+	case 1966: // LifetapEffectSK
+	case 2710: // Trickster's Torment
+	case 2711: // Trickster's TormentSK
+	case 2717: // MentalCorruptionEffect
+	case 2718: // ScreamOfDeathEffect
+	case 2720: // SpLightningEffect
+	case 2721: // SpBlizzardEffect
+	case 2722: // SpInfernoEffect
+	case 2723: // SpScorpionEffect
+	case 2724: // SpVerminEffect
+	case 2725: // SpWindEffect
+	case 2726: // SpStormtEffect
+	case 2729: // Condemnation of Nife
+	case 2774: // Harmful Touch
+	case 2784: // Tainted Bite
+	case 2834: // Blade Dance
+	case 2835: // Blade DanceSK
+	case 2876: // JoltingBladesEffect
+	case 2889: // SpFlameEffect
+	case 2891: // SpSnowEffect
+		return true;
+	default:
+		return false;
+	}
+}
+
 // this is called after the timer is up and the spell is finished
 // casting. everything goes through here, including items with zero cast time
 // only to be used from SpellProcess
@@ -1141,65 +1277,47 @@ void Mob::CastedSpellFinished(uint16 spell_id, uint32 target_id, CastingSlot slo
 			}
 		}
 	}
-	else if (!spells[spell_id].uninterruptable) // not bard, check movement
+	else if (!spells[spell_id].uninterruptable && !(IsClient() && IsRoguePoison(spell_id)))
 	{
-		// special case - this item can be cast while moving, by any player, not just bards
-		if ((IsClient() && ((slot == CastingSlot::Item)) && inventory_slot != 0xFFFFFFFF) &&
-			CastToClient()->GetItemIDAt(inventory_slot) == 28906 /* Bracelet of the Shadow Hive */)
+		const float d_x = GetX() - GetSpellX();
+		const float d_y = GetY() - GetSpellY();
+		if (IsClient() && GetAppearance() != eaStanding)
 		{
-			LogSpellsDetail("Casting from clicky item [{}].  Allowing cast while moving.", CastToClient()->GetInv()[inventory_slot]->GetItem()->Name);
+			InterruptSpell(StringID::CAST_UPRIGHT_AND_STILL, Chat::SpellFailure, spell_id);
+			return;
 		}
-		// if has been attacked, or moved while casting, try to channel
-		else if (attacked_count > 0 || GetX() != GetSpellX() || GetY() != GetSpellY())
+		// The player check has a 0.1 deadband
+		else if (attacked_count > 0 || (IsClient() && (std::abs(d_x) > 0.1 || std::abs(d_y) > 0.1)))
 		{
 			uint16 channel_chance = 0;
 
 			if (IsClient())
 			{
-				// this is fairly accurate (but not perfect) and based on decompiles
-
-				// client is holding down forward movement key or no skill
-				if (animation > 0 || GetSkill(EQ::skills::SkillChanneling) == 0)
+				// the client uses IHaveSkill rather than Skill, so worn Channeling modifiers do not contribute.
+				const int skill = GetAvailableCastingSkill(*CastToClient(), EQ::skills::SkillChanneling);
+				if (animation != 0 || skill == 0 || std::abs(d_x) > 1.0 || std::abs(d_y) > 1.0)
 				{
 					InterruptSpell();
 					return;
 				}
 
-				float d_x, d_y;
-				if (GetX() != GetSpellX() || GetY() != GetSpellY())
+				const int max_loops = std::max(1, attacked_count * 3 / 4 + 1);
+				int roll = zone->random.Int(1, 390);
+				// Channeling Focus scales the roll to 95/90/85%, including item casts.
+				roll = (100 - aabonuses.ChannelChanceSpells) * roll / 100;
+
+				// this reuses one roll for every hit count check so additional hits don't reduce channeling chance
+				for (int i = 0; i < max_loops; ++i)
 				{
-					d_x = std::abs(std::abs(GetX()) - std::abs(GetSpellX()));
-					d_y = std::abs(std::abs(GetY()) - std::abs(GetSpellY()));
-					if (d_x > 1.00001f || d_y > 1.00001f)
+					const int spell_level = spells[spell_id].classes[GetClass() - 1];
+					int bonus_chance = 0;
+					if (GetLevel() > spell_level + 5)
 					{
-						InterruptSpell();
-						return;
-					}
-				}
-
-				uint16 bonus_chance = 0;
-				uint16 spell_level = spells[spell_id].classes[GetClass() - 1];
-				uint16 roll = 0;
-				uint16 loops = 0;
-				uint16 max_loops = attacked_count * 3 / 4 + 1;		// makes channeling a bit more forgiving if the number of hits > 4.  this is in decompiles
-				if (max_loops < 1)
-					max_loops = 1;
-
-				do {
-					roll = zone->random.Int(1, 390);
-					if (!IsFromItem && aabonuses.ChannelChanceSpells)
-					{
-						roll = (100 - aabonuses.ChannelChanceSpells) * roll / 100;
-					}
-
-					if (GetLevel() > (spell_level + 5))
 						bonus_chance = 3 * (GetLevel() - spell_level) + 35;
+					}
 
-					channel_chance = GetSkill(EQ::skills::SkillChanneling) + GetLevel() + bonus_chance;
-					if (channel_chance > 370)
-						channel_chance = 370;
-
-					LogSpellsDetail("Checking Interruption: spell x: [{}]  spell y: [{}]  cur x: [{}]  cur y: [{}] channelchance [{}] channeling skill [{}]\n", GetSpellX(), GetSpellY(), GetX(), GetY(), channel_chance, GetSkill(EQ::skills::SkillChanneling));
+					channel_chance = std::min(370, skill + GetLevel() + bonus_chance);
+					LogSpellsDetail("Checking Interruption: spell x: [{}] spell y: [{}] cur x: [{}] cur y: [{}] channelchance [{}] channeling skill [{}] roll [{}]", GetSpellX(), GetSpellY(), GetX(), GetY(), channel_chance, skill, roll);
 
 					if (roll > channel_chance && roll >= 39)
 					{
@@ -1207,9 +1325,7 @@ void Mob::CastedSpellFinished(uint16 spell_id, uint32 target_id, CastingSlot slo
 						InterruptSpell(SPELL_UNKNOWN, true);
 						return;
 					}
-
-					loops++;
-				} while (loops < max_loops);
+				}
 
 				regain_conc = true;
 			}
