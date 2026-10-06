@@ -1,0 +1,13 @@
+CREATE TABLE IF NOT EXISTS takp_bot_buffs (
+ bot_id INT UNSIGNED NOT NULL, slot SMALLINT UNSIGNED NOT NULL,
+ spell_id SMALLINT UNSIGNED NOT NULL, caster_level TINYINT UNSIGNED NOT NULL,
+ ticks INT NOT NULL, counters INT NOT NULL, melee_rune INT UNSIGNED NOT NULL,
+ magic_rune INT UNSIGNED NOT NULL, instrument_mod SMALLINT NOT NULL,
+ PRIMARY KEY(bot_id,slot)
+) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS takp_bot_recasts (
+ bot_id INT UNSIGNED NOT NULL, spell_id SMALLINT UNSIGNED NOT NULL,
+ available_at DATETIME(3) NOT NULL,
+ PRIMARY KEY(bot_id,spell_id)
+) ENGINE=InnoDB;
+INSERT IGNORE INTO takp_bot_schema(version) VALUES(3);

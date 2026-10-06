@@ -34,6 +34,8 @@
 #include "../common/events/player_event_logs.h"
 
 extern QueryServ* QServ;
+void command_companion(Client *c, const Seperator *sep);
+void command_bot(Client *c, const Seperator *sep);
 extern WorldServer worldserver;
 extern FastMath g_Math;
 void CatchSignal(int sig_num);
@@ -84,6 +86,8 @@ int command_init(void)
 	}
 
 	if (
+		command_add("bot", "[help] - Create and command your persistent bots.", AccountStatus::Player, command_bot) ||
+		command_add("companion", "[spawn|follow|stay|group|ungroup|dismiss] - Experimental noncombat companion (development only).", AccountStatus::GMImpossible, command_companion) ||
 		command_add("advnpcspawn", "[maketype|makegroup|addgroupentry|addgroupspawn][removegroupspawn|movespawn|editgroupbox|cleargroupbox].", AccountStatus::GMImpossible, command_advnpcspawn) ||
 		command_add("aggrozone", "[aggro] [0/1: Enforce ignore distance. If 0 or not set, all will come] - Aggro every mob in the zone with X aggro. Default is 0. Not recommend if you're not invulnerable.", AccountStatus::GMImpossible, command_aggrozone) ||
 		command_add("ai", "[factionid/spellslist/con/guard/roambox/stop/start] - Modify AI on NPC target.", AccountStatus::GMImpossible, command_ai) ||
@@ -495,7 +499,7 @@ int command_realdispatch(Client* c, std::string message, bool ignore_status)
 		const std::string& sub_command = sep.arg[1];
 
 		for (const auto& e : command_subsettings) {
-			if (e.sub_command == sub_command) {
+			if (e.sub_command == sub_command && (cur->function != command_bot || e.parent_command == "bot")) {
 				can_use_subcommand = c->Admin() >= static_cast<int16>(e.access_level);
 				is_subcommand = true;
 				found_subcommand_setting = true;
@@ -505,7 +509,7 @@ int command_realdispatch(Client* c, std::string message, bool ignore_status)
 
 		if (!found_subcommand_setting) {
 			for (const auto& e : command_subsettings) {
-				if (e.sub_command == sub_command) {
+				if (e.sub_command == sub_command && (cur->function != command_bot || e.parent_command == "bot")) {
 					can_use_subcommand = c->Admin() >= static_cast<int16>(e.access_level);
 					is_subcommand = true;
 					break;

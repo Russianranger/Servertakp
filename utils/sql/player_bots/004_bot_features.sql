@@ -1,0 +1,34 @@
+-- Additive bot-only state; safe to repeat against each destination database.
+CREATE TABLE IF NOT EXISTS takp_bot_settings (
+ bot_id INT UNSIGNED PRIMARY KEY,
+ ranged_mode TINYINT UNSIGNED NOT NULL DEFAULT 0,
+ taunt_enabled TINYINT UNSIGNED NOT NULL DEFAULT 0,
+ pet_enabled TINYINT UNSIGNED NOT NULL DEFAULT 1,
+ follow_distance INT UNSIGNED NOT NULL DEFAULT 100,
+ PRIMARY_ROLE VARCHAR(16) NOT NULL DEFAULT 'balanced'
+) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS takp_bot_supplies (
+ bot_id INT UNSIGNED NOT NULL, item_id INT UNSIGNED NOT NULL,
+ quantity INT UNSIGNED NOT NULL,
+ PRIMARY KEY(bot_id,item_id)
+) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS takp_bot_pets (
+ bot_id INT UNSIGNED PRIMARY KEY, spell_id SMALLINT UNSIGNED NOT NULL,
+ hp INT NOT NULL, mana INT NOT NULL, name VARCHAR(63) NOT NULL
+) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS takp_bot_pet_buffs (
+ bot_id INT UNSIGNED NOT NULL, slot SMALLINT UNSIGNED NOT NULL,
+ spell_id SMALLINT UNSIGNED NOT NULL, caster_level TINYINT UNSIGNED NOT NULL,
+ ticks INT NOT NULL, counters INT NOT NULL, melee_rune INT UNSIGNED NOT NULL,
+ magic_rune INT UNSIGNED NOT NULL, instrument_mod SMALLINT NOT NULL,
+ PRIMARY KEY(bot_id,slot)
+) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS takp_bot_pet_items (
+ bot_id INT UNSIGNED NOT NULL, slot SMALLINT UNSIGNED NOT NULL,
+ item_id INT UNSIGNED NOT NULL, PRIMARY KEY(bot_id,slot)
+) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS takp_bot_songs (
+ bot_id INT UNSIGNED NOT NULL, position TINYINT UNSIGNED NOT NULL,
+ spell_id SMALLINT UNSIGNED NOT NULL, PRIMARY KEY(bot_id,position)
+) ENGINE=InnoDB;
+INSERT IGNORE INTO takp_bot_schema(version) VALUES(4);

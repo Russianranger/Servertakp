@@ -1,3 +1,4 @@
+#include "player_bot.h"
 /*	EQEMu: Everquest Server Emulator
 	Copyright (C) 2001-2002 EQEMu Development Team (http://eqemulator.net)
 
@@ -38,7 +39,7 @@ int Mob::DoSpecialAttackDamage(Mob *defender, EQ::skills::SkillType skill, int b
 
 	int damage = 1;
 	int damageBonus = 0;
-	if (IsNPC())
+	if (IsNPC() && !IsPlayerBot(this))
 	{
 		damageBonus = CastToNPC()->GetDamageBonus();
 		hate = base / 2;
@@ -80,7 +81,7 @@ int Mob::DoSpecialAttackDamage(Mob *defender, EQ::skills::SkillType skill, int b
 		if (skill == EQ::skills::SkillBash && base == 1)
 			damage = 1;	// 0 skill bashes always do 1 damage (10 if it crits)
 
-		if (IsClient())
+		if (IsClient() || IsPlayerBot(this))
 			TryCriticalHit(defender, skill, damage);
 	}
 
@@ -110,7 +111,7 @@ void Mob::TryBashKickStun(Mob* defender, uint8 skill)
 	if (skill == EQ::skills::SkillKick && ((GetClass() != Class::Warrior && GetClass() != Class::WarriorGM) || GetLevel() < 55))
 		return;
 
-	if (skill == EQ::skills::SkillDragonPunch && (!IsClient() || !CastToClient()->HasInstantDisc(skill)))
+	if (skill == EQ::skills::SkillDragonPunch && !((IsClient() && CastToClient()->HasInstantDisc(skill)) || PlayerBotInstantDisc(this,skill)))
 		return;
 
 	// this is precise for the vast majority of NPCs
@@ -142,7 +143,7 @@ void Mob::TryBashKickStun(Mob* defender, uint8 skill)
 
 		int stun_resist = 0;
 
-		if (defender->IsClient())
+		if (defender->IsClient() || IsPlayerBot(defender))
 		{
 			stun_resist = defender->aabonuses.StunResist;						// Stalwart Endurance AA
 		}
@@ -172,7 +173,7 @@ void Mob::TryBashKickStun(Mob* defender, uint8 skill)
 		// This is a crude approximation of interrupt chance based on old EQ log parses
 		int interruptChance = 100;
 
-		if (IsNPC() && !IsPet())
+		if (IsNPC() && !IsPet() && !IsPlayerBot(this))
 		{
 			if (GetLevel() < defenderLevel)
 				interruptChance = 80;		// Daybreak recently confirmed this 80% chance
@@ -246,6 +247,14 @@ void Mob::DoBash(Mob* defender)
 		}
 	}
 
+ if(is_trained && IsPlayerBot(this)) {
+  const auto *shield=database.GetItem(GetEquipment(EQ::textures::weaponSecondary));
+  if(shield && shield->ItemType==EQ::item::ItemTypeShield) {
+   shieldBash=true;const int cap=base+GetLevel()/5+2;base=std::min(base+shield->AC,cap);hate=base;
+   int focus=GetFuriousBash(shield->Focus.Effect);
+   if(focus && WorldContentService::Instance()->IsTheShadowsOfLuclinEnabled())hate=base*(100+zone->random.Int(1,focus))/100;
+  }
+ }
 	int minDmg = 1;
 	if (defender->IsImmuneToMelee(this, shieldBash ? EQ::invslot::slotSecondary : EQ::invslot::slotPrimary)) {
 		minDmg = DMG_INVUL;
@@ -273,6 +282,23 @@ void Mob::DoKick(Mob* defender)
 
 void NPC::DoBackstab(Mob* defender)
 {
+ if(IsPlayerBot(this)) {
+  if(!defender)defender=GetTarget();
+  if(!defender || defender==this)return;
+  const auto *weapon=database.GetItem(GetEquipment(EQ::textures::weaponPrimary));
+  if(!weapon || weapon->ItemType!=EQ::item::ItemType1HPiercing)return;
+  const bool frontal=!BehindMob(defender,GetX(),GetY());
+  if(frontal && !aabonuses.FrontalBackstabMinDmg){Attack(defender);return;}
+  int stabs=!frontal && GetLevel()>54 && CheckDoubleAttack()?2:1;
+  int base=((GetSkill(EQ::skills::SkillBackstab)*0.02f)+2.0f)*GetBaseDamage(defender,EQ::invslot::slotPrimary);
+  int hate=base,minHit=GetLevel()>=60?GetLevel()*2:GetLevel()>50?GetLevel()*3/2:GetLevel();
+  if(defender->IsImmuneToMelee(this,EQ::invslot::slotPrimary))minHit=DMG_INVUL;
+  else if(frontal)base=1;
+  for(int n=0;n<stabs && defender->GetHP()>0 && GetTarget() && !HasDied();++n)
+   DoSpecialAttackDamage(defender,EQ::skills::SkillBackstab,base,minHit,hate,DoAnimation::Piercing);
+  return;
+ }
+
 	if (!defender)
 		defender = GetTarget();
 	if (defender == this || !defender)
@@ -603,9 +629,9 @@ int Mob::DoMonkSpecialAttack(Mob* other, uint8 unchecked_type, bool fromWus)
 	
 	int damage = DoSpecialAttackDamage(other, skill_type, base, min_dmg, 0, anim_type);
 
-	if (IsClient())
+	if (IsClient() || IsPlayerBot(this))
 	{
-		CastToClient()->CheckIncreaseSkill(skill_type, other, zone->skill_difficulty[skill_type].difficulty[GetClass()]);
+		if(IsClient()) CastToClient()->CheckIncreaseSkill(skill_type, other, zone->skill_difficulty[skill_type].difficulty[GetClass()]);
 
 		if (damage > 0 && skill_type == EQ::skills::SkillDragonPunch && GetAA(aaDragonPunch) && !fromWus)
 		{
@@ -1383,16 +1409,16 @@ void NPC::DoClassAttacks(Mob *target)
 		{
 			case Class::ShadowKnight: case Class::ShadowKnightGM:
 			{
-				CastSpell(SPELL_HARM_TOUCH, target->GetID());
-				knightreuse = HarmTouchReuseTimeNPC;
+				bool cast=CastSpell(SPELL_HARM_TOUCH, target->GetID());
+				knightreuse = IsPlayerBot(this)?(cast?HarmTouchReuseTime:2):HarmTouchReuseTimeNPC;
 				break;
 			}
 			case Class::Paladin: case Class::PaladinGM:
 			{
 				if(GetHPRatio() < 20)
 				{
-					CastSpell(SPELL_LAY_ON_HANDS, GetID());
-					knightreuse = LayOnHandsReuseTimeNPC;
+					bool cast=CastSpell(SPELL_LAY_ON_HANDS, GetID());
+					knightreuse = IsPlayerBot(this)?(cast?LayOnHandsReuseTime:2):LayOnHandsReuseTimeNPC;
 				} else {
 					knightreuse = 2; //Check again in two seconds.
 				}
@@ -1403,7 +1429,7 @@ void NPC::DoClassAttacks(Mob *target)
 	}
 
 	// pet taunt
-	if (taunting && HasOwner() && !IsCharmedPet() && target->IsNPC() && taunt_time && CombatRange(target))
+ if (!IsPlayerBot(this) && taunting && HasOwner() && !IsCharmedPet() && target->IsNPC() && taunt_time && CombatRange(target))
 	{
 		// pet taunt is 6 seconds with a chance at not working.  easily seen in logs
 		// most times it's 6 seconds between 'taunting attacker master', sometimes 12, somtimes 18, etc
@@ -1423,7 +1449,13 @@ void NPC::DoClassAttacks(Mob *target)
 		return;
 
 	int reuse = 8;
-
+ const bool bot=IsPlayerBot(this);
+ const auto *offhand=bot?database.GetItem(GetEquipment(EQ::textures::weaponSecondary)):nullptr;
+ const auto *mainhand=bot?database.GetItem(GetEquipment(EQ::textures::weaponPrimary)):nullptr;
+ const bool botWeaponBash=mainhand && (mainhand->ID==11050 || mainhand->ID==10099 || mainhand->ID==14383 ||
+  (GetAA(aa2HandBash) && (mainhand->ItemType==EQ::item::ItemType2HSlash || mainhand->ItemType==EQ::item::ItemType2HBlunt || mainhand->ItemType==EQ::item::ItemType2HPiercing)));
+ const bool canBash=!bot || (offhand && offhand->ItemType==EQ::item::ItemTypeShield) || botWeaponBash || HasBashEnablingWeapon() ||
+  GetRace()==Race::Ogre || GetRace()==Race::Troll || GetRace()==Race::Barbarian;
 	if (skills[EQ::skills::SkillBackstab])
 	{
 		reuse = BackstabReuseTime;
@@ -1451,7 +1483,7 @@ void NPC::DoClassAttacks(Mob *target)
 	}
 	else if (skills[EQ::skills::SkillKick])
 	{
-		if (GetSkill(EQ::skills::SkillBash) && zone->random.Roll(66))			// NPCs with both skills parsed at a 2/3rds bash to kick rate
+		if (canBash && GetSkill(EQ::skills::SkillBash) && zone->random.Roll(66))			// NPCs with both skills parsed at a 2/3rds bash to kick rate
 		{
 			reuse = BashReuseTime;
 			DoBash(target);
@@ -1462,7 +1494,7 @@ void NPC::DoClassAttacks(Mob *target)
 			DoKick(target);
 		}
 	}
-	else if (skills[EQ::skills::SkillBash])
+	else if (canBash && skills[EQ::skills::SkillBash])
 	{
 		reuse = BashReuseTime;
 		DoBash(target);

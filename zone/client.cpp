@@ -1,3 +1,4 @@
+#include "player_bot.h"
 /*	EQEMu: Everquest Server Emulator
 	Copyright (C) 2001-2003 EQEMu Development Team (http://eqemulator.org)
 
@@ -361,6 +362,7 @@ Client::Client(EQStreamInterface* ieqs) : Mob(
 }
 
 Client::~Client() {
+	if (is_zone_loaded) SavePlayerBots(this);
 	SendAllPackets();
 	mMovementManager->RemoveClient(this);
 
@@ -1200,6 +1202,12 @@ void Client::ChannelMessageReceived(uint8 chan_num, uint8 language, uint8 lang_s
 			}
 		}
 
+		if(message[0] == '^') {
+			std::string bot_command=message+1;
+			if(bot_command.compare(0,3,"bot")==0) bot_command.erase(0,3);
+			command_dispatch(this, ("#bot "+bot_command).c_str(), false);
+			break;
+		}
 		if(message[0] == COMMAND_CHAR) {
 			if (command_dispatch(this, message, false) == -2) {
 				if(parse->PlayerHasQuestSub(EVENT_COMMAND)) {

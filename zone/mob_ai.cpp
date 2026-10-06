@@ -29,6 +29,7 @@
 #include "map.h"
 #include "mob.h"
 #include "npc.h"
+#include "player_bot.h"
 #include "quest_parser_collection.h"
 #include "string_ids.h"
 #include "water_map.h"
@@ -94,6 +95,8 @@ bool NPC::AICastSpell(Mob* tar, uint8 iChance, uint16 iSpellTypes, bool zeroPrio
 			//return false;
 			continue;
 		}
+		// Skip disabled bot nukes before selection so DoTs and support spells remain eligible.
+		if (!PlayerBotDirectDamageAllowed(this,AIspells[i].spellid)) continue;
 		if (iSpellTypes & AIspells[i].type)
 		{
 			// manacost has special values, -1 is no mana cost, -2 is instant cast (no mana)
@@ -1928,6 +1931,7 @@ void Mob::AI_Process() {
 			{
 				Mob* follow = entity_list.GetMob(GetFollowID());
 				if (!follow) SetFollowID(0);
+				else if (HandlePlayerBotFormation(this, follow)) { /* formation handled this idle follow tick */ }
 				else {
 
 					float distance = DistanceSquared(m_Position, follow->GetPosition());

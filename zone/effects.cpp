@@ -998,6 +998,7 @@ void EntityList::AETaunt(Client* taunter, float range)
 // causes caster to hit every mob within dist range of center with spell_id.
 // NPC spells will only affect other NPCs with compatible faction
 // resisted determines if the spell landed on the original target or not, so we know whether to count them towards the limit
+#include "player_bot.h"
 void EntityList::AESpell(Mob *caster, Mob *center, uint16 spell_id, bool affect_caster, int16 resist_adjust, Mob* spell_target, bool initial_cast)
 {
 	Mob *curmob = nullptr;
@@ -1005,20 +1006,21 @@ void EntityList::AESpell(Mob *caster, Mob *center, uint16 spell_id, bool affect_
 	if (!caster) return;
 	float dist = caster->GetAOERange(spell_id);
 	// raid boss NPCs get a radius extension to PBAoE spells
-	if (caster->IsNPC() && spells[spell_id].targettype == ST_AECaster && spells[spell_id].mana == 0)
+	if (caster->IsNPC() && !IsPlayerBot(caster) && spells[spell_id].targettype == ST_AECaster && spells[spell_id].mana == 0)
 		dist *= 1.25f;
 
 	float dist2 = dist * dist;
 	float dist_targ = 0;
 
 	bool detrimental = IsDetrimentalSpell(spell_id);
-	bool clientcaster = caster->IsClient();
+	const bool bot_caster = IsPlayerBot(caster);
+	bool clientcaster = caster->IsClient() || bot_caster;
 	int MAX_TARGETS_ALLOWED = 5;
 
 	// Wizard's Al'Kabor line of spells hits 5 targets.
 	static const int16 target_exemptions[] = { 382, 458, 459, 460, 731, 1650, 1651, 1652 };
 
-	if (caster->IsNPC())
+	if (caster->IsNPC() && !bot_caster)
 		MAX_TARGETS_ALLOWED = 999;
 	else if (HasDirectDamageEffect(spell_id))
 	{
@@ -1080,6 +1082,9 @@ void EntityList::AESpell(Mob *caster, Mob *center, uint16 spell_id, bool affect_
 		dist_targ = DistanceSquared(curmob->GetPosition(), center->GetPosition());
 
 		if (dist_targ > dist2)	//make sure they are in range
+			continue;
+		// Bots use owner-aware permissions for all area spells, not NPC faction.
+		if (bot_caster && !PlayerBotSpellTargetAllowed(caster,curmob,spell_id))
 			continue;
 		if (!clientcaster && curmob->IsNPC()) {	//check npc->npc casting
 			FACTION_VALUE f = curmob->GetReverseFactionCon(caster);
@@ -1182,10 +1187,11 @@ void EntityList::MassGroupBuff(Mob *caster, Mob *center, uint16 spell_id)
 	float dist = caster->GetAOERange(spell_id);
 	float dist2 = dist * dist;
 
-	for (auto it = client_list.begin(); it != client_list.end(); ++it)
+	for (auto it = mob_list.begin(); it != mob_list.end(); ++it)
 	{
-		Client *curclient = it->second;
-		if (!curclient->CastToClient()->ClientFinishedLoading())
+		Mob *curclient = it->second;
+        if(!curclient->IsClient() && !IsPlayerBot(curclient))continue;
+		if (curclient->IsClient() && !curclient->CastToClient()->ClientFinishedLoading())
 			continue;
 		if (DistanceSquared(center->GetPosition(), curclient->GetPosition()) > dist2)	//make sure they are in range
 			continue;

@@ -1,3 +1,4 @@
+#include "player_bot.h"
 /*	EQEMu: Everquest Server Emulator
 	Copyright (C) 2001-2009 EQEMu Development Team (http://eqemulator.net)
 
@@ -577,6 +578,7 @@ void Client::CompleteConnect()
 	// entity_list.SendZoneAppearance(this);
 
 	client_data_loaded = true;
+	RestorePlayerBots(this);
 
 	UpdateActiveLight();
 	SendAppearancePacket(AppearanceType::Light, GetActiveLightType());
@@ -8371,6 +8373,14 @@ void Client::Handle_OP_TradeAcceptClick(const EQApplicationPacket *app)
 {
 	Mob* with = trade->With();
 	trade->state = TradeAccepted;
+	if(IsPlayerBot(with)) {
+        if(FinishPlayerBotTrade(this,with)) {
+            trade->Reset();with->trade->Reset();
+            auto *done=new EQApplicationPacket(OP_FinishTrade,0);FastQueuePacket(&done);
+            done=new EQApplicationPacket(OP_TradeReset,0);FastQueuePacket(&done);
+        }
+        return;
+    }
 
 	if (with && with->IsClient()) {
 		//finish trade...
@@ -8660,6 +8670,12 @@ void Client::Handle_OP_TradeRequest(const EQApplicationPacket *app)
 	}
 
 	Mob* tradee = entity_list.GetMob(msg->to_mob_id);
+	if (IsPlayerBot(tradee) && !CanTradePlayerBot(this,tradee)) {
+		Message(Chat::White, "You may trade equipment only with your own nearby bot while out of combat.");
+		auto *cancel = new EQApplicationPacket(OP_CancelTrade, sizeof(CancelTrade_Struct));
+		reinterpret_cast<CancelTrade_Struct*>(cancel->pBuffer)->fromid=tradee->GetID();
+		FastQueuePacket(&cancel); return;
+	}
 
 	if (tradee && tradee->IsClient()) 
 	{
@@ -8743,6 +8759,12 @@ void Client::Handle_OP_TradeRequestAck(const EQApplicationPacket *app)
 	// Send ack on to trade initiator if client
 	TradeRequest_Struct* msg = (TradeRequest_Struct*)app->pBuffer;
 	Mob* tradee = entity_list.GetMob(msg->to_mob_id);
+	if (IsPlayerBot(tradee) && !CanTradePlayerBot(this,tradee)) {
+		Message(Chat::White, "You may trade equipment only with your own nearby bot while out of combat.");
+		auto *cancel = new EQApplicationPacket(OP_CancelTrade, sizeof(CancelTrade_Struct));
+		reinterpret_cast<CancelTrade_Struct*>(cancel->pBuffer)->fromid=tradee->GetID();
+		FastQueuePacket(&cancel); return;
+	}
 
 	if (tradee && tradee->IsClient() && tradee->trade->state == Requesting && tradee->trade->GetWithID() == GetID()) {
 		trade->Start(msg->to_mob_id);

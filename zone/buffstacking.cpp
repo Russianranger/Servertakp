@@ -21,6 +21,7 @@ Copyright (C) 2001-2002 EQEMu Development Team (http://eqemu.org)
 #include "string_ids.h"
 
 #include "mob.h"
+#include "player_bot.h"
 #include "client.h"
 
 #include <assert.h>
@@ -794,10 +795,10 @@ bool Mob::AssignBuffSlot(Mob *caster, uint16 spell_id, int &buffslot, int &caste
 	int emptyslot = -1;
 	bool isdisc = IsDisc(spell_id);
 
-	if (isdisc && IsClient())
+	if (isdisc && (IsClient() || IsPlayerBot(this)))
 	{
 		// cavedude's discipline implementation uses a 16th buff slot to hold discipline spells and these don't interact with buffs
-		buffslot = emptyslot = CastToClient()->GetDiscBuffSlot();
+		buffslot = emptyslot = IsClient()?CastToClient()->GetDiscBuffSlot():GetMaxTotalSlots()-1;
 		BuffFadeBySlot(emptyslot, false, true, false);
 	}
 	else

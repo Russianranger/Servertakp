@@ -1,3 +1,4 @@
+#include "player_bot.h"
 /*	EQEMu: Everquest Server Emulator
 	Copyright (C) 2001-2002 EQEMu Development Team (http://eqemu.org)
 
@@ -18,6 +19,7 @@
 #include "../common/global_define.h"
 #include "../common/eqemu_logsys.h"
 #include "masterentity.h"
+#include "companion.h"
 #include "../common/packet_functions.h"
 #include "../common/packet_dump.h"
 #include "../common/strings.h"
@@ -684,7 +686,7 @@ int32 Group::GetTotalGroupDamage(Mob* other)
 		if(!members[i])
 			continue;
 		
-		total += other->GetDamageAmount(members[i], true);
+		if (!IsPlayerBot(members[i])) total += other->GetDamageAmount(members[i], true);
 	}
 	return total;
 }
@@ -876,6 +878,11 @@ void Group::VerifyGroup()
 		}
 
 		bool valid = true;
+		// Companions exist only in this zone. Their destructor removes membership;
+		// unlike characters, they must not be looked up in the group_id table.
+		if (members[i] && (IsTransientCompanion(members[i]) || IsPlayerBot(members[i]))) {
+			continue;
+		}
 		std::string query = StringFormat("SELECT count(*) FROM group_id WHERE groupid = %lu and name = '%s'", (unsigned long)GetID(), membername[i]);
 		auto results = database.QueryDatabase(query);
 
