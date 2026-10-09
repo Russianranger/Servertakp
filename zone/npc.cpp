@@ -1,3 +1,4 @@
+#include "player_bot.h"
 /*	EQEMu: Everquest Server Emulator
 	Copyright (C) 2001-2002 EQEMu Development Team (http://eqemu.org)
 
@@ -2529,6 +2530,7 @@ void NPC::DepopSwarmPets()
 
 int32 NPC::GetHPRegen() 
 {
+ if(IsPlayerBot(this))return PlayerBotRegen(this,false);
 	uint32 bonus = 0;
 	if(GetAppearance() == eaSitting)
 		bonus = 1;
@@ -2549,6 +2551,7 @@ int32 NPC::GetHPRegen()
 
 int32 NPC::GetManaRegen()
 {
+ if(IsPlayerBot(this))return PlayerBotRegen(this,true);
 	uint32 bonus = 0;
 	if(GetAppearance() == eaSitting)
 		bonus += 3;	// made-up, prob should not exist

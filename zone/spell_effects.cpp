@@ -27,6 +27,7 @@
 #include "../common/misc_functions.h"
 
 #include "quest_parser_collection.h"
+#include "player_bot.h"
 #include "string_ids.h"
 #include "worldserver.h"
 
@@ -507,7 +508,7 @@ bool Mob::SpellEffect(Mob* caster, uint16 spell_id, int buffslot, int caster_lev
 					max_level = RuleI(Spells, BaseImmunityLevel);
 
 				// stun level limits apply when landing on NPCs only
-				if (IsClient() || (caster && caster->IsNPC()))
+				if (IsClient() || (caster && caster->IsNPC() && !IsPlayerBot(caster)))
 					max_level = 999;
 
 				// Ignore if spell is beneficial (ex. Harvest)
@@ -520,7 +521,7 @@ bool Mob::SpellEffect(Mob* caster, uint16 spell_id, int buffslot, int caster_lev
 					// the formula calculation for this effect returns the max level.  the base contains the duration.
 					int stun_duration = spell.base[i];
 
-					if (caster->IsClient())
+					if (caster->IsClient() || IsPlayerBot(caster))
 					{
 						// cap player stuns on NPCs at 7.5 seconds
 						if (stun_duration > 7500 && IsNPC())
@@ -618,7 +619,7 @@ bool Mob::SpellEffect(Mob* caster, uint16 spell_id, int buffslot, int caster_lev
 					if(buffs[buffslot].ticsremaining > RuleI(Character, MaxCharmDurationForPlayerCharacter))
 						buffs[buffslot].ticsremaining = RuleI(Character, MaxCharmDurationForPlayerCharacter);
 				}
-				if (caster->IsNPC())
+				if (caster->IsNPC() && !IsPlayerBot(caster))
 				{
 					AddToHateList(caster->GetHateRandom(), 20);
 					AddToHateList(caster->GetHateTop(), 1);
@@ -1278,7 +1279,7 @@ bool Mob::SpellEffect(Mob* caster, uint16 spell_id, int buffslot, int caster_lev
 
 				// NPCs ignore level limits in their spells
 				if(GetSpecialAbility(SpecialAbility::StunImmunity) ||
-					(GetLevel() > max_level && caster && caster->IsClient() && IsNPC()))
+					(GetLevel() > max_level && caster && (caster->IsClient() || IsPlayerBot(caster)) && IsNPC()))
 				{
 					caster->Message_StringID(Chat::SpellFailure, StringID::IMMUNE_STUN);
 				}
@@ -2605,7 +2606,9 @@ void Mob::ApplyPeriodicHPEffects()
 									AddToHateList(buff_caster, -hate_amount);
 							}
 
-							if (buff_caster->IsNPC())
+							if (IsPlayerBot(buff_caster))
+                                effect_value = PlayerBotDoTDamage(buff_caster,spell_id,effect_value);
+                            else if (buff_caster->IsNPC())
 								effect_value = buff_caster->CastToNPC()->GetActSpellDamage(spell_id, effect_value, this);
 
 							// damage credit
@@ -2623,7 +2626,7 @@ void Mob::ApplyPeriodicHPEffects()
 								total_damage += adj_damage;
 
 								// Pets should not be included.
-								if (buff_caster->IsClient())
+								if (buff_caster->IsClient() || IsPlayerBot(buff_caster))
 								{
 									player_damage += adj_damage;
 								}
@@ -2631,7 +2634,7 @@ void Mob::ApplyPeriodicHPEffects()
 								if (buff_caster->IsDireCharmed())
 									dire_pet_damage += adj_damage;
 
-								if (buff_caster->IsNPC() && (!buff_caster->IsPet() || (buff_caster->GetOwner() && buff_caster->GetOwner()->IsNPC())))
+								if (buff_caster->IsNPC() && !IsPlayerBot(buff_caster) && !IsPlayerBotPet(buff_caster) && (!buff_caster->IsPet() || (buff_caster->GetOwner() && buff_caster->GetOwner()->IsNPC())))
 									npc_damage += adj_damage;
 							}
 						}
@@ -2927,7 +2930,7 @@ void Mob::DoBuffTic(uint16 spell_id, int slot, uint32 ticsremaining, uint8 caste
 
 					if (resist_check != 100.0f)
 					{
-						if (caster->IsClient())
+						if (caster && (caster->IsClient() || IsPlayerBot(caster)))
 						{
 							if (zone->random.Int(1, 100) > caster->aabonuses.CharmBreakChance)	// Total Domination AA
 								breakCharm = true;

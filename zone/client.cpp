@@ -46,6 +46,7 @@
 #include "worldserver.h"
 #include "zonedb.h"
 #include "petitions.h"
+#include "player_bot.h"
 #include "command.h"
 #include "string_ids.h"
 #include "water_map.h"
@@ -361,6 +362,7 @@ Client::Client(std::unique_ptr<RDPStream> stream) : Mob(
 }
 
 Client::~Client() {
+	if (is_zone_loaded) SavePlayerBots(this);
 	// Normal removal closes the stream earlier. This covers zone teardown and other direct destruction.
 	CloseStream(RDPConnectionDisposition::ZoneShutdown, 0);
 
@@ -1538,6 +1540,12 @@ void Client::ChannelMessageReceived(uint8 chan_num, uint8 language, uint8 lang_s
 			}
 		}
 
+		if(message[0] == '^') {
+			std::string bot_command=message+1;
+			if(bot_command.compare(0,3,"bot")==0) bot_command.erase(0,3);
+			command_dispatch(this, ("#bot "+bot_command).c_str(), false);
+			break;
+		}
 		if(message[0] == COMMAND_CHAR) {
 			if (command_dispatch(this, message, false) == -2) {
 				if(parse->PlayerHasQuestSub(EVENT_COMMAND)) {
@@ -3333,6 +3341,7 @@ void Client::LinkDead()
 {
 	ClearPendingZoneTransfer();
 	CloseStream(RDPConnectionDisposition::Linkdead, 0);
+	if (ClientDataLoaded()) SavePlayerBots(this);
 
 	CancelTradeSession(GetID(), false);
 	CancelPendingTradeRequests();

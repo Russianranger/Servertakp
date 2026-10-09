@@ -1,0 +1,780 @@
+TAKP PLAYER BOTS - COMPLETE CREATION AND COMMAND GUIDE
+Installed package: October 3, 2026
+
+This guide describes YOUR custom TAKP bot package, not standard EQEmu bots.
+Source: package README.md and takp-bots.patch command handlers.
+Installed binary SHA256:
+3eab3f06a68b3470c76704fbc3b8e2b7c8649ec0effcaa1de8e53b3b3e09f56c
+
+CONTENTS
+1. Getting started and selecting bots
+2. Complete command reference
+3. Equipment slots and restrictions
+4. Creation IDs and all 420 creation combinations
+
+1. GETTING STARTED
+==================
+Enter commands in Say chat. Names and IDs in angle brackets are placeholders;
+replace them and omit the brackets. Use the lowercase command words shown.
+
+Example: female human cleric
+  #bot create Mercy 2 1 1
+  #bot spawn Mercy
+  #bot assist all
+  #bot report Mercy
+
+Bots belong to the CHARACTER that creates them, match its level, and use group
+slots. Up to five bots can accompany one player, subject to available slots.
+Names must be unique among characters and bots and contain 4-15 letters only.
+All supported race/class combinations are allowed, even combinations unavailable
+to normal player characters. Equipment race/class restrictions still apply.
+
+Selecting a bot:
+  #bot follow Mercy           Select by name.
+  #bot follow target          Select your targeted, owned bot.
+  #bot follow                 With no name, uses your targeted, owned bot.
+  #bot follow byname Mercy    Explicit name selection.
+  #bot follow all             Apply to your spawned bots.
+  #bot follow spawned         Alias for all.
+  #bot follow ownergroup      Alias for all in this build.
+
+For commands with extra arguments, use a name or the literal target selector:
+  #bot taunt target 1
+For a spell directed at another creature, name the bot and target the recipient.
+Omitting a spell target generally defaults to yourself, subject to spell rules.
+
+Use all mainly for movement/combat commands. Many commands acting on spawned
+bots also accept all, but a name is preferable for item transfers and settings.
+Creation/list, saved parties, revival, deletion, inventories, supplies, and healing
+rotation management have their own syntax below; do not assume all works there.
+Most operational commands require the bot to be spawned. Roster commands,
+inventory/supply listings, and certain rotation operations can use saved records.
+
+2. COMPLETE COMMAND REFERENCE
+=============================
+Each line gives the command followed by its purpose or restrictions.
+
+ROSTER AND LIFECYCLE
+#bot
+#bot help
+  Show the built-in help. This document corrects its equipment slot note:
+  equipment slots are 1-21; slot 0 is the player cursor, not a charm slot.
+#bot list
+  List bots belonging to your current character.
+#bot create <Name> <ClassID> <RaceID> <GenderID>
+  Create a saved bot. See the complete combination list at the end.
+#bot spawn <Name>
+  Spawn your saved bot into available group/raid-subgroup space.
+#bot spawn all
+  Try your roster in bot-ID order until the five-bot limit/free slots are reached.
+#bot dismiss <Name|all>
+#bot camp <Name|all>
+  Save and dismiss. camp is an alias. Refused during combat.
+#bot revive <Name>
+  Revive an unspawned fallen bot after a 60-second wait, out of combat.
+  Restores 1 HP and 0 mana; use spawn afterward. This is not player resurrection.
+#bot delete <Name> confirm
+  Permanently delete a saved bot. First dismiss it, retrieve equipment/supplies,
+  and remove healing-rotation memberships. This is not a dismissal command.
+
+MOVEMENT, COMBAT AND STATUS
+#bot attack <Name|all>
+  Attack your selected eligible NPC within 200 units of the bot.
+#bot assist <Name|all>
+  Enable combat assistance.
+#bot passive <Name|all>
+  Clear bot/pet combat targets, interrupt the bot's spell, and follow you.
+#bot follow <Name|all>
+  Follow you. Does not itself change the combat stance.
+#bot stay <Name|all>
+  Stop navigation and remain at the current spot; not a passive-combat toggle.
+#bot summon <Name|all>
+  Move the bot to you and resume following, only out of combat.
+#bot report <Name|all>
+  Display level, current/max HP, current/max mana, and pet name.
+#bot suspend <Name|all>
+  Suspend behavior, become passive, and stay. The bot remains spawned.
+#bot release <Name|all>
+  Clear suspension and resume assisting/following.
+#bot ranged <Name> <0|1>
+  Disable/enable ranged mode; usable weapon/ammunition and other checks apply.
+#bot taunt <Name> <0|1>
+  Disable/enable taunting.
+#bot followdistance <Name> <Value>
+  Set follow-distance parameter, 0-2500. Default stored value is 100.
+  This is the server's internal distance parameter; do not assume feet/metres.
+
+SPELLS AND UTILITY
+These commands still check class, level, target, range, mana, reagents and reuse.
+#bot spells <Name>
+  List the bot's loaded spells.
+#bot cast <Name> <SpellID>
+  Cast a spell available to this bot's class and level on your selected target.
+#bot cure <Name>
+  Attempt an appropriate cure on the selected recipient.
+#bot resurrect <Name>
+#bot rez <Name>
+  Attempt resurrection on a valid selected target. rez is an alias.
+#bot mez <Name>
+  Attempt mesmerization of the selected enemy.
+#bot charm <Name>
+  Attempt charm on the selected enemy.
+#bot fear <Name>
+  Attempt fear on the selected enemy.
+#bot lull <Name>
+  Attempt a lull spell on the selected enemy.
+#bot invisibility <Name>
+  Attempt invisibility on the selected recipient.
+#bot invisundead <Name>
+  Attempt invisibility versus undead on the selected recipient.
+#bot levitate <Name>
+  Attempt levitation on the selected recipient.
+#bot waterbreathing <Name>
+  Attempt water breathing on the selected recipient.
+#bot departures <Name>
+  List known group travel spells.
+#bot depart <Name> <SpellID>
+  Cast a known teleport/succor spell. Usual target and casting restrictions apply.
+#bot evac <Name>
+  Attempt an available group evacuation spell.
+#bot songs <Name> <SpellID1> [SpellID2] [SpellID3] [SpellID4]
+  Configure up to four bard songs known at the bot's level.
+#bot songs <Name>
+  Clear the saved bard song rotation.
+
+PET COMMANDS
+#bot pet <Name>
+  Attempt to summon the bot's pet; class, spell and reagent checks apply.
+#bot petdismiss <Name>
+  Dismiss the pet out of combat and disable pet use. Charmed NPCs are released.
+#bot petenabled <Name> <0|1>
+  Disable/enable pet use; use 1 to re-enable after petdismiss.
+  Bot pets are separate from your own pet. Supported summoned-pet state is saved.
+
+SPELL SETTINGS AND HEALING PREFERENCES
+#bot spellsettingsadd <Name> <SpellID> <Enabled> <MinHP> <MaxHP> <Priority>
+#bot spellsettingsupdate <Name> <SpellID> <Enabled> <MinHP> <MaxHP> <Priority>
+  Add/update a spell rule. Enabled: 0/1; HP bounds: 0-100 with MinHP <= MaxHP;
+  priority: 0-1000, higher tried first. Use actual valid spell IDs.
+#bot spellsettings <Name>
+  List saved spell rules.
+#bot spellsettingsdelete <Name> <SpellID>
+  Remove a saved spell rule.
+#bot enforcespellsettings <Name> <0|1>
+  Disable/enable enforcement of the configured spell settings.
+#bot blockedbuffs <Name> <SpellID> <0|1>
+  1 blocks a valid beneficial spell on this bot; 0 unblocks it.
+#bot healpercent <Name> <Percent>
+  Set healing threshold, 0-100.
+#bot announcecasts <Name> <0|1>
+  Disable/enable casting announcements.
+
+ABILITIES
+#bot abilities <Name>
+  List available class/level disciplines and enabled TAKP AAs.
+#bot discipline <Name> <DisciplineID>
+  Activate an available discipline. Use IDs from abilities.
+#bot aa <Name> <AbilityID>
+  Activate an available AA with class/level, state, target and reuse checks.
+  AAs are NOT automatically granted by default. The package has an operator-only
+  database option named autoaas, not a #bot autoaas command. Even when enabled,
+  no AAs are granted below level 51. Unsupported AA actions are refused.
+
+EQUIPMENT AND REAGENTS
+#bot inventory <Name>
+  List saved equipment slots, item IDs and charges.
+#bot equip <Name> <PlayerSlot> <BotSlot>
+  Move an item from your general inventory slot 22-29 to bot equipment slot 1-21.
+#bot unequip <Name> <EmptyPlayerSlot> <BotSlot>
+  Return bot equipment to your empty general slot 22-29.
+  IMPORTANT: PlayerSlot comes before BotSlot for BOTH commands.
+#bot clickitem <Name> <BotSlot>
+  Activate a supported equipped item click on your target (or you if untargeted).
+#bot supply <Name> <PlayerSlot>
+  Deposit a plain reagent stack from your general slot 22-29.
+#bot supplies <Name>
+  List deposited reagent item IDs and quantities.
+#bot withdraw <Name> <EmptyPlayerSlot> <ItemID>
+  Return up to one reagent stack to your empty general slot 22-29.
+
+Direct trade is also supported: open a trade with your own bot and offer ordinary
+equipment. Items are validated together; replaced gear and coins return to you.
+Item transfers require no combat and valid ownership, item, lore, level, race,
+class and weapon combinations. Bags/custom-data items are refused. Explicit
+equip/unequip requires an empty destination. No-drop gear and stacked ammunition
+are supported. Reagents are consumed when casting finishes.
+
+HEALING ROTATIONS
+Leader and Healer below are owned BOT NAMES; TargetName is a friendly group member.
+Healing classes: cleric, paladin, ranger, druid, shaman, beastlord.
+#bot healrotationcreate <Leader>
+  Create a stopped rotation with the leader as its first healer.
+#bot healrotationaddmember <Leader> <Healer>
+  Add your healing bot. A healer can belong to only one rotation.
+#bot healrotationremovemember <Leader> <Healer>
+  Remove that healer from the rotation.
+#bot healrotationaddtarget <Leader> <TargetName>
+  Add a friendly group target. Spawn the leader and have the target present.
+#bot healrotationremovetarget <Leader> <TargetName>
+  Remove the named healing target.
+#bot healrotationchangeinterval <Leader> <Milliseconds>
+  Set interval from 500 to 60000 ms. Initial interval: 3000 ms.
+#bot healrotationstart <Leader>
+  Enable the rotation. Healers need to be spawned to act.
+#bot healrotationstop <Leader>
+  Disable the rotation while retaining its configuration.
+#bot healrotationlist <Leader>
+  List enabled state, interval, healers and targets.
+#bot healrotationdelete <Leader>
+  Remove the rotation configuration, not the bots.
+Without explicit targets, the rotation selects injured group members.
+
+SAVED PARTIES
+#bot botgroupcreate <PartyName>
+  Save your currently spawned bots. Reusing a party name replaces that selection.
+#bot botgroupload <PartyName>
+  Spawn the saved party into available slots. Dismiss other bots first if needed.
+#bot botgrouplist
+  List your saved parties and their bot members.
+#bot botgroupdelete <PartyName>
+  Delete the saved selection only; retain bots and their equipment.
+Party names: 1-32 letters, numbers or underscores, no spaces.
+Use the full command botgroupload, NOT the shorthand load from abbreviated help.
+
+APPEARANCE
+#bot appearance <Name> <Field> <Value>
+  Fields: face, hair, haircolor, beard, beardcolor, eye1, eye2.
+  Values must pass the race/gender-specific appearance checks (not every value
+  works for every race). Dismiss and respawn to apply a saved appearance.
+  This changes appearance choices, not the bot's race/class/gender.
+
+There is no player #bot command in this package to rename a bot, change its
+race/class/gender, set its level, or grant GM/account privileges. #companion is
+a separate restricted development command and is not part of player bot usage.
+This is not full modern EQEmu command parity; ^ commands from other servers
+should not be assumed to work. Full client rendering and all class/level cases
+were not exhaustively verified by the package's automated tests.
+
+3. EQUIPMENT SLOTS
+==================
+PlayerSlot: 22-29 = eight top-level general inventory slots; not slots inside bags.
+BotSlot:
+  1 left ear       2 head          3 face          4 right ear
+  5 neck           6 shoulders     7 arms          8 back
+  9 left wrist    10 right wrist  11 ranged       12 hands
+ 13 primary       14 secondary    15 left finger  16 right finger
+ 17 chest         18 legs         19 feet         20 waist
+ 21 ammunition
+Slot 0 is the cursor in TAKP, not a charm equipment slot.
+Example: #bot equip Mercy 22 13
+Example: #bot unequip Mercy 22 13   (your slot 22 must now be empty)
+
+4. CREATION IDS AND EVERY COMBINATION
+====================================
+Syntax: #bot create <Name> <ClassID> <RaceID> <GenderID>
+Gender 0 = male; gender 1 = female.
+15 classes x 14 races x 2 genders = 420 supported creation combinations.
+Replace <Name> with a different available 4-15-letter name for each bot.
+The commands below are alternatives, not a script to run all at once.
+
+CLASS IDS
+  1 = Warrior
+  2 = Cleric
+  3 = Paladin
+  4 = Ranger
+  5 = Shadow Knight
+  6 = Druid
+  7 = Monk
+  8 = Bard
+  9 = Rogue
+ 10 = Shaman
+ 11 = Necromancer
+ 12 = Wizard
+ 13 = Magician
+ 14 = Enchanter
+ 15 = Beastlord
+
+RACE IDS
+  1 = Human
+  2 = Barbarian
+  3 = Erudite
+  4 = Wood Elf
+  5 = High Elf
+  6 = Dark Elf
+  7 = Half Elf
+  8 = Dwarf
+  9 = Troll
+ 10 = Ogre
+ 11 = Halfling
+ 12 = Gnome
+128 = Iksar
+130 = Vah Shir
+
+WARRIOR - CLASS 1
+#bot create <Name> 1 1 0    -- male Human Warrior
+#bot create <Name> 1 1 1    -- female Human Warrior
+#bot create <Name> 1 2 0    -- male Barbarian Warrior
+#bot create <Name> 1 2 1    -- female Barbarian Warrior
+#bot create <Name> 1 3 0    -- male Erudite Warrior
+#bot create <Name> 1 3 1    -- female Erudite Warrior
+#bot create <Name> 1 4 0    -- male Wood Elf Warrior
+#bot create <Name> 1 4 1    -- female Wood Elf Warrior
+#bot create <Name> 1 5 0    -- male High Elf Warrior
+#bot create <Name> 1 5 1    -- female High Elf Warrior
+#bot create <Name> 1 6 0    -- male Dark Elf Warrior
+#bot create <Name> 1 6 1    -- female Dark Elf Warrior
+#bot create <Name> 1 7 0    -- male Half Elf Warrior
+#bot create <Name> 1 7 1    -- female Half Elf Warrior
+#bot create <Name> 1 8 0    -- male Dwarf Warrior
+#bot create <Name> 1 8 1    -- female Dwarf Warrior
+#bot create <Name> 1 9 0    -- male Troll Warrior
+#bot create <Name> 1 9 1    -- female Troll Warrior
+#bot create <Name> 1 10 0    -- male Ogre Warrior
+#bot create <Name> 1 10 1    -- female Ogre Warrior
+#bot create <Name> 1 11 0    -- male Halfling Warrior
+#bot create <Name> 1 11 1    -- female Halfling Warrior
+#bot create <Name> 1 12 0    -- male Gnome Warrior
+#bot create <Name> 1 12 1    -- female Gnome Warrior
+#bot create <Name> 1 128 0    -- male Iksar Warrior
+#bot create <Name> 1 128 1    -- female Iksar Warrior
+#bot create <Name> 1 130 0    -- male Vah Shir Warrior
+#bot create <Name> 1 130 1    -- female Vah Shir Warrior
+
+CLERIC - CLASS 2
+#bot create <Name> 2 1 0    -- male Human Cleric
+#bot create <Name> 2 1 1    -- female Human Cleric
+#bot create <Name> 2 2 0    -- male Barbarian Cleric
+#bot create <Name> 2 2 1    -- female Barbarian Cleric
+#bot create <Name> 2 3 0    -- male Erudite Cleric
+#bot create <Name> 2 3 1    -- female Erudite Cleric
+#bot create <Name> 2 4 0    -- male Wood Elf Cleric
+#bot create <Name> 2 4 1    -- female Wood Elf Cleric
+#bot create <Name> 2 5 0    -- male High Elf Cleric
+#bot create <Name> 2 5 1    -- female High Elf Cleric
+#bot create <Name> 2 6 0    -- male Dark Elf Cleric
+#bot create <Name> 2 6 1    -- female Dark Elf Cleric
+#bot create <Name> 2 7 0    -- male Half Elf Cleric
+#bot create <Name> 2 7 1    -- female Half Elf Cleric
+#bot create <Name> 2 8 0    -- male Dwarf Cleric
+#bot create <Name> 2 8 1    -- female Dwarf Cleric
+#bot create <Name> 2 9 0    -- male Troll Cleric
+#bot create <Name> 2 9 1    -- female Troll Cleric
+#bot create <Name> 2 10 0    -- male Ogre Cleric
+#bot create <Name> 2 10 1    -- female Ogre Cleric
+#bot create <Name> 2 11 0    -- male Halfling Cleric
+#bot create <Name> 2 11 1    -- female Halfling Cleric
+#bot create <Name> 2 12 0    -- male Gnome Cleric
+#bot create <Name> 2 12 1    -- female Gnome Cleric
+#bot create <Name> 2 128 0    -- male Iksar Cleric
+#bot create <Name> 2 128 1    -- female Iksar Cleric
+#bot create <Name> 2 130 0    -- male Vah Shir Cleric
+#bot create <Name> 2 130 1    -- female Vah Shir Cleric
+
+PALADIN - CLASS 3
+#bot create <Name> 3 1 0    -- male Human Paladin
+#bot create <Name> 3 1 1    -- female Human Paladin
+#bot create <Name> 3 2 0    -- male Barbarian Paladin
+#bot create <Name> 3 2 1    -- female Barbarian Paladin
+#bot create <Name> 3 3 0    -- male Erudite Paladin
+#bot create <Name> 3 3 1    -- female Erudite Paladin
+#bot create <Name> 3 4 0    -- male Wood Elf Paladin
+#bot create <Name> 3 4 1    -- female Wood Elf Paladin
+#bot create <Name> 3 5 0    -- male High Elf Paladin
+#bot create <Name> 3 5 1    -- female High Elf Paladin
+#bot create <Name> 3 6 0    -- male Dark Elf Paladin
+#bot create <Name> 3 6 1    -- female Dark Elf Paladin
+#bot create <Name> 3 7 0    -- male Half Elf Paladin
+#bot create <Name> 3 7 1    -- female Half Elf Paladin
+#bot create <Name> 3 8 0    -- male Dwarf Paladin
+#bot create <Name> 3 8 1    -- female Dwarf Paladin
+#bot create <Name> 3 9 0    -- male Troll Paladin
+#bot create <Name> 3 9 1    -- female Troll Paladin
+#bot create <Name> 3 10 0    -- male Ogre Paladin
+#bot create <Name> 3 10 1    -- female Ogre Paladin
+#bot create <Name> 3 11 0    -- male Halfling Paladin
+#bot create <Name> 3 11 1    -- female Halfling Paladin
+#bot create <Name> 3 12 0    -- male Gnome Paladin
+#bot create <Name> 3 12 1    -- female Gnome Paladin
+#bot create <Name> 3 128 0    -- male Iksar Paladin
+#bot create <Name> 3 128 1    -- female Iksar Paladin
+#bot create <Name> 3 130 0    -- male Vah Shir Paladin
+#bot create <Name> 3 130 1    -- female Vah Shir Paladin
+
+RANGER - CLASS 4
+#bot create <Name> 4 1 0    -- male Human Ranger
+#bot create <Name> 4 1 1    -- female Human Ranger
+#bot create <Name> 4 2 0    -- male Barbarian Ranger
+#bot create <Name> 4 2 1    -- female Barbarian Ranger
+#bot create <Name> 4 3 0    -- male Erudite Ranger
+#bot create <Name> 4 3 1    -- female Erudite Ranger
+#bot create <Name> 4 4 0    -- male Wood Elf Ranger
+#bot create <Name> 4 4 1    -- female Wood Elf Ranger
+#bot create <Name> 4 5 0    -- male High Elf Ranger
+#bot create <Name> 4 5 1    -- female High Elf Ranger
+#bot create <Name> 4 6 0    -- male Dark Elf Ranger
+#bot create <Name> 4 6 1    -- female Dark Elf Ranger
+#bot create <Name> 4 7 0    -- male Half Elf Ranger
+#bot create <Name> 4 7 1    -- female Half Elf Ranger
+#bot create <Name> 4 8 0    -- male Dwarf Ranger
+#bot create <Name> 4 8 1    -- female Dwarf Ranger
+#bot create <Name> 4 9 0    -- male Troll Ranger
+#bot create <Name> 4 9 1    -- female Troll Ranger
+#bot create <Name> 4 10 0    -- male Ogre Ranger
+#bot create <Name> 4 10 1    -- female Ogre Ranger
+#bot create <Name> 4 11 0    -- male Halfling Ranger
+#bot create <Name> 4 11 1    -- female Halfling Ranger
+#bot create <Name> 4 12 0    -- male Gnome Ranger
+#bot create <Name> 4 12 1    -- female Gnome Ranger
+#bot create <Name> 4 128 0    -- male Iksar Ranger
+#bot create <Name> 4 128 1    -- female Iksar Ranger
+#bot create <Name> 4 130 0    -- male Vah Shir Ranger
+#bot create <Name> 4 130 1    -- female Vah Shir Ranger
+
+SHADOW KNIGHT - CLASS 5
+#bot create <Name> 5 1 0    -- male Human Shadow Knight
+#bot create <Name> 5 1 1    -- female Human Shadow Knight
+#bot create <Name> 5 2 0    -- male Barbarian Shadow Knight
+#bot create <Name> 5 2 1    -- female Barbarian Shadow Knight
+#bot create <Name> 5 3 0    -- male Erudite Shadow Knight
+#bot create <Name> 5 3 1    -- female Erudite Shadow Knight
+#bot create <Name> 5 4 0    -- male Wood Elf Shadow Knight
+#bot create <Name> 5 4 1    -- female Wood Elf Shadow Knight
+#bot create <Name> 5 5 0    -- male High Elf Shadow Knight
+#bot create <Name> 5 5 1    -- female High Elf Shadow Knight
+#bot create <Name> 5 6 0    -- male Dark Elf Shadow Knight
+#bot create <Name> 5 6 1    -- female Dark Elf Shadow Knight
+#bot create <Name> 5 7 0    -- male Half Elf Shadow Knight
+#bot create <Name> 5 7 1    -- female Half Elf Shadow Knight
+#bot create <Name> 5 8 0    -- male Dwarf Shadow Knight
+#bot create <Name> 5 8 1    -- female Dwarf Shadow Knight
+#bot create <Name> 5 9 0    -- male Troll Shadow Knight
+#bot create <Name> 5 9 1    -- female Troll Shadow Knight
+#bot create <Name> 5 10 0    -- male Ogre Shadow Knight
+#bot create <Name> 5 10 1    -- female Ogre Shadow Knight
+#bot create <Name> 5 11 0    -- male Halfling Shadow Knight
+#bot create <Name> 5 11 1    -- female Halfling Shadow Knight
+#bot create <Name> 5 12 0    -- male Gnome Shadow Knight
+#bot create <Name> 5 12 1    -- female Gnome Shadow Knight
+#bot create <Name> 5 128 0    -- male Iksar Shadow Knight
+#bot create <Name> 5 128 1    -- female Iksar Shadow Knight
+#bot create <Name> 5 130 0    -- male Vah Shir Shadow Knight
+#bot create <Name> 5 130 1    -- female Vah Shir Shadow Knight
+
+DRUID - CLASS 6
+#bot create <Name> 6 1 0    -- male Human Druid
+#bot create <Name> 6 1 1    -- female Human Druid
+#bot create <Name> 6 2 0    -- male Barbarian Druid
+#bot create <Name> 6 2 1    -- female Barbarian Druid
+#bot create <Name> 6 3 0    -- male Erudite Druid
+#bot create <Name> 6 3 1    -- female Erudite Druid
+#bot create <Name> 6 4 0    -- male Wood Elf Druid
+#bot create <Name> 6 4 1    -- female Wood Elf Druid
+#bot create <Name> 6 5 0    -- male High Elf Druid
+#bot create <Name> 6 5 1    -- female High Elf Druid
+#bot create <Name> 6 6 0    -- male Dark Elf Druid
+#bot create <Name> 6 6 1    -- female Dark Elf Druid
+#bot create <Name> 6 7 0    -- male Half Elf Druid
+#bot create <Name> 6 7 1    -- female Half Elf Druid
+#bot create <Name> 6 8 0    -- male Dwarf Druid
+#bot create <Name> 6 8 1    -- female Dwarf Druid
+#bot create <Name> 6 9 0    -- male Troll Druid
+#bot create <Name> 6 9 1    -- female Troll Druid
+#bot create <Name> 6 10 0    -- male Ogre Druid
+#bot create <Name> 6 10 1    -- female Ogre Druid
+#bot create <Name> 6 11 0    -- male Halfling Druid
+#bot create <Name> 6 11 1    -- female Halfling Druid
+#bot create <Name> 6 12 0    -- male Gnome Druid
+#bot create <Name> 6 12 1    -- female Gnome Druid
+#bot create <Name> 6 128 0    -- male Iksar Druid
+#bot create <Name> 6 128 1    -- female Iksar Druid
+#bot create <Name> 6 130 0    -- male Vah Shir Druid
+#bot create <Name> 6 130 1    -- female Vah Shir Druid
+
+MONK - CLASS 7
+#bot create <Name> 7 1 0    -- male Human Monk
+#bot create <Name> 7 1 1    -- female Human Monk
+#bot create <Name> 7 2 0    -- male Barbarian Monk
+#bot create <Name> 7 2 1    -- female Barbarian Monk
+#bot create <Name> 7 3 0    -- male Erudite Monk
+#bot create <Name> 7 3 1    -- female Erudite Monk
+#bot create <Name> 7 4 0    -- male Wood Elf Monk
+#bot create <Name> 7 4 1    -- female Wood Elf Monk
+#bot create <Name> 7 5 0    -- male High Elf Monk
+#bot create <Name> 7 5 1    -- female High Elf Monk
+#bot create <Name> 7 6 0    -- male Dark Elf Monk
+#bot create <Name> 7 6 1    -- female Dark Elf Monk
+#bot create <Name> 7 7 0    -- male Half Elf Monk
+#bot create <Name> 7 7 1    -- female Half Elf Monk
+#bot create <Name> 7 8 0    -- male Dwarf Monk
+#bot create <Name> 7 8 1    -- female Dwarf Monk
+#bot create <Name> 7 9 0    -- male Troll Monk
+#bot create <Name> 7 9 1    -- female Troll Monk
+#bot create <Name> 7 10 0    -- male Ogre Monk
+#bot create <Name> 7 10 1    -- female Ogre Monk
+#bot create <Name> 7 11 0    -- male Halfling Monk
+#bot create <Name> 7 11 1    -- female Halfling Monk
+#bot create <Name> 7 12 0    -- male Gnome Monk
+#bot create <Name> 7 12 1    -- female Gnome Monk
+#bot create <Name> 7 128 0    -- male Iksar Monk
+#bot create <Name> 7 128 1    -- female Iksar Monk
+#bot create <Name> 7 130 0    -- male Vah Shir Monk
+#bot create <Name> 7 130 1    -- female Vah Shir Monk
+
+BARD - CLASS 8
+#bot create <Name> 8 1 0    -- male Human Bard
+#bot create <Name> 8 1 1    -- female Human Bard
+#bot create <Name> 8 2 0    -- male Barbarian Bard
+#bot create <Name> 8 2 1    -- female Barbarian Bard
+#bot create <Name> 8 3 0    -- male Erudite Bard
+#bot create <Name> 8 3 1    -- female Erudite Bard
+#bot create <Name> 8 4 0    -- male Wood Elf Bard
+#bot create <Name> 8 4 1    -- female Wood Elf Bard
+#bot create <Name> 8 5 0    -- male High Elf Bard
+#bot create <Name> 8 5 1    -- female High Elf Bard
+#bot create <Name> 8 6 0    -- male Dark Elf Bard
+#bot create <Name> 8 6 1    -- female Dark Elf Bard
+#bot create <Name> 8 7 0    -- male Half Elf Bard
+#bot create <Name> 8 7 1    -- female Half Elf Bard
+#bot create <Name> 8 8 0    -- male Dwarf Bard
+#bot create <Name> 8 8 1    -- female Dwarf Bard
+#bot create <Name> 8 9 0    -- male Troll Bard
+#bot create <Name> 8 9 1    -- female Troll Bard
+#bot create <Name> 8 10 0    -- male Ogre Bard
+#bot create <Name> 8 10 1    -- female Ogre Bard
+#bot create <Name> 8 11 0    -- male Halfling Bard
+#bot create <Name> 8 11 1    -- female Halfling Bard
+#bot create <Name> 8 12 0    -- male Gnome Bard
+#bot create <Name> 8 12 1    -- female Gnome Bard
+#bot create <Name> 8 128 0    -- male Iksar Bard
+#bot create <Name> 8 128 1    -- female Iksar Bard
+#bot create <Name> 8 130 0    -- male Vah Shir Bard
+#bot create <Name> 8 130 1    -- female Vah Shir Bard
+
+ROGUE - CLASS 9
+#bot create <Name> 9 1 0    -- male Human Rogue
+#bot create <Name> 9 1 1    -- female Human Rogue
+#bot create <Name> 9 2 0    -- male Barbarian Rogue
+#bot create <Name> 9 2 1    -- female Barbarian Rogue
+#bot create <Name> 9 3 0    -- male Erudite Rogue
+#bot create <Name> 9 3 1    -- female Erudite Rogue
+#bot create <Name> 9 4 0    -- male Wood Elf Rogue
+#bot create <Name> 9 4 1    -- female Wood Elf Rogue
+#bot create <Name> 9 5 0    -- male High Elf Rogue
+#bot create <Name> 9 5 1    -- female High Elf Rogue
+#bot create <Name> 9 6 0    -- male Dark Elf Rogue
+#bot create <Name> 9 6 1    -- female Dark Elf Rogue
+#bot create <Name> 9 7 0    -- male Half Elf Rogue
+#bot create <Name> 9 7 1    -- female Half Elf Rogue
+#bot create <Name> 9 8 0    -- male Dwarf Rogue
+#bot create <Name> 9 8 1    -- female Dwarf Rogue
+#bot create <Name> 9 9 0    -- male Troll Rogue
+#bot create <Name> 9 9 1    -- female Troll Rogue
+#bot create <Name> 9 10 0    -- male Ogre Rogue
+#bot create <Name> 9 10 1    -- female Ogre Rogue
+#bot create <Name> 9 11 0    -- male Halfling Rogue
+#bot create <Name> 9 11 1    -- female Halfling Rogue
+#bot create <Name> 9 12 0    -- male Gnome Rogue
+#bot create <Name> 9 12 1    -- female Gnome Rogue
+#bot create <Name> 9 128 0    -- male Iksar Rogue
+#bot create <Name> 9 128 1    -- female Iksar Rogue
+#bot create <Name> 9 130 0    -- male Vah Shir Rogue
+#bot create <Name> 9 130 1    -- female Vah Shir Rogue
+
+SHAMAN - CLASS 10
+#bot create <Name> 10 1 0    -- male Human Shaman
+#bot create <Name> 10 1 1    -- female Human Shaman
+#bot create <Name> 10 2 0    -- male Barbarian Shaman
+#bot create <Name> 10 2 1    -- female Barbarian Shaman
+#bot create <Name> 10 3 0    -- male Erudite Shaman
+#bot create <Name> 10 3 1    -- female Erudite Shaman
+#bot create <Name> 10 4 0    -- male Wood Elf Shaman
+#bot create <Name> 10 4 1    -- female Wood Elf Shaman
+#bot create <Name> 10 5 0    -- male High Elf Shaman
+#bot create <Name> 10 5 1    -- female High Elf Shaman
+#bot create <Name> 10 6 0    -- male Dark Elf Shaman
+#bot create <Name> 10 6 1    -- female Dark Elf Shaman
+#bot create <Name> 10 7 0    -- male Half Elf Shaman
+#bot create <Name> 10 7 1    -- female Half Elf Shaman
+#bot create <Name> 10 8 0    -- male Dwarf Shaman
+#bot create <Name> 10 8 1    -- female Dwarf Shaman
+#bot create <Name> 10 9 0    -- male Troll Shaman
+#bot create <Name> 10 9 1    -- female Troll Shaman
+#bot create <Name> 10 10 0    -- male Ogre Shaman
+#bot create <Name> 10 10 1    -- female Ogre Shaman
+#bot create <Name> 10 11 0    -- male Halfling Shaman
+#bot create <Name> 10 11 1    -- female Halfling Shaman
+#bot create <Name> 10 12 0    -- male Gnome Shaman
+#bot create <Name> 10 12 1    -- female Gnome Shaman
+#bot create <Name> 10 128 0    -- male Iksar Shaman
+#bot create <Name> 10 128 1    -- female Iksar Shaman
+#bot create <Name> 10 130 0    -- male Vah Shir Shaman
+#bot create <Name> 10 130 1    -- female Vah Shir Shaman
+
+NECROMANCER - CLASS 11
+#bot create <Name> 11 1 0    -- male Human Necromancer
+#bot create <Name> 11 1 1    -- female Human Necromancer
+#bot create <Name> 11 2 0    -- male Barbarian Necromancer
+#bot create <Name> 11 2 1    -- female Barbarian Necromancer
+#bot create <Name> 11 3 0    -- male Erudite Necromancer
+#bot create <Name> 11 3 1    -- female Erudite Necromancer
+#bot create <Name> 11 4 0    -- male Wood Elf Necromancer
+#bot create <Name> 11 4 1    -- female Wood Elf Necromancer
+#bot create <Name> 11 5 0    -- male High Elf Necromancer
+#bot create <Name> 11 5 1    -- female High Elf Necromancer
+#bot create <Name> 11 6 0    -- male Dark Elf Necromancer
+#bot create <Name> 11 6 1    -- female Dark Elf Necromancer
+#bot create <Name> 11 7 0    -- male Half Elf Necromancer
+#bot create <Name> 11 7 1    -- female Half Elf Necromancer
+#bot create <Name> 11 8 0    -- male Dwarf Necromancer
+#bot create <Name> 11 8 1    -- female Dwarf Necromancer
+#bot create <Name> 11 9 0    -- male Troll Necromancer
+#bot create <Name> 11 9 1    -- female Troll Necromancer
+#bot create <Name> 11 10 0    -- male Ogre Necromancer
+#bot create <Name> 11 10 1    -- female Ogre Necromancer
+#bot create <Name> 11 11 0    -- male Halfling Necromancer
+#bot create <Name> 11 11 1    -- female Halfling Necromancer
+#bot create <Name> 11 12 0    -- male Gnome Necromancer
+#bot create <Name> 11 12 1    -- female Gnome Necromancer
+#bot create <Name> 11 128 0    -- male Iksar Necromancer
+#bot create <Name> 11 128 1    -- female Iksar Necromancer
+#bot create <Name> 11 130 0    -- male Vah Shir Necromancer
+#bot create <Name> 11 130 1    -- female Vah Shir Necromancer
+
+WIZARD - CLASS 12
+#bot create <Name> 12 1 0    -- male Human Wizard
+#bot create <Name> 12 1 1    -- female Human Wizard
+#bot create <Name> 12 2 0    -- male Barbarian Wizard
+#bot create <Name> 12 2 1    -- female Barbarian Wizard
+#bot create <Name> 12 3 0    -- male Erudite Wizard
+#bot create <Name> 12 3 1    -- female Erudite Wizard
+#bot create <Name> 12 4 0    -- male Wood Elf Wizard
+#bot create <Name> 12 4 1    -- female Wood Elf Wizard
+#bot create <Name> 12 5 0    -- male High Elf Wizard
+#bot create <Name> 12 5 1    -- female High Elf Wizard
+#bot create <Name> 12 6 0    -- male Dark Elf Wizard
+#bot create <Name> 12 6 1    -- female Dark Elf Wizard
+#bot create <Name> 12 7 0    -- male Half Elf Wizard
+#bot create <Name> 12 7 1    -- female Half Elf Wizard
+#bot create <Name> 12 8 0    -- male Dwarf Wizard
+#bot create <Name> 12 8 1    -- female Dwarf Wizard
+#bot create <Name> 12 9 0    -- male Troll Wizard
+#bot create <Name> 12 9 1    -- female Troll Wizard
+#bot create <Name> 12 10 0    -- male Ogre Wizard
+#bot create <Name> 12 10 1    -- female Ogre Wizard
+#bot create <Name> 12 11 0    -- male Halfling Wizard
+#bot create <Name> 12 11 1    -- female Halfling Wizard
+#bot create <Name> 12 12 0    -- male Gnome Wizard
+#bot create <Name> 12 12 1    -- female Gnome Wizard
+#bot create <Name> 12 128 0    -- male Iksar Wizard
+#bot create <Name> 12 128 1    -- female Iksar Wizard
+#bot create <Name> 12 130 0    -- male Vah Shir Wizard
+#bot create <Name> 12 130 1    -- female Vah Shir Wizard
+
+MAGICIAN - CLASS 13
+#bot create <Name> 13 1 0    -- male Human Magician
+#bot create <Name> 13 1 1    -- female Human Magician
+#bot create <Name> 13 2 0    -- male Barbarian Magician
+#bot create <Name> 13 2 1    -- female Barbarian Magician
+#bot create <Name> 13 3 0    -- male Erudite Magician
+#bot create <Name> 13 3 1    -- female Erudite Magician
+#bot create <Name> 13 4 0    -- male Wood Elf Magician
+#bot create <Name> 13 4 1    -- female Wood Elf Magician
+#bot create <Name> 13 5 0    -- male High Elf Magician
+#bot create <Name> 13 5 1    -- female High Elf Magician
+#bot create <Name> 13 6 0    -- male Dark Elf Magician
+#bot create <Name> 13 6 1    -- female Dark Elf Magician
+#bot create <Name> 13 7 0    -- male Half Elf Magician
+#bot create <Name> 13 7 1    -- female Half Elf Magician
+#bot create <Name> 13 8 0    -- male Dwarf Magician
+#bot create <Name> 13 8 1    -- female Dwarf Magician
+#bot create <Name> 13 9 0    -- male Troll Magician
+#bot create <Name> 13 9 1    -- female Troll Magician
+#bot create <Name> 13 10 0    -- male Ogre Magician
+#bot create <Name> 13 10 1    -- female Ogre Magician
+#bot create <Name> 13 11 0    -- male Halfling Magician
+#bot create <Name> 13 11 1    -- female Halfling Magician
+#bot create <Name> 13 12 0    -- male Gnome Magician
+#bot create <Name> 13 12 1    -- female Gnome Magician
+#bot create <Name> 13 128 0    -- male Iksar Magician
+#bot create <Name> 13 128 1    -- female Iksar Magician
+#bot create <Name> 13 130 0    -- male Vah Shir Magician
+#bot create <Name> 13 130 1    -- female Vah Shir Magician
+
+ENCHANTER - CLASS 14
+#bot create <Name> 14 1 0    -- male Human Enchanter
+#bot create <Name> 14 1 1    -- female Human Enchanter
+#bot create <Name> 14 2 0    -- male Barbarian Enchanter
+#bot create <Name> 14 2 1    -- female Barbarian Enchanter
+#bot create <Name> 14 3 0    -- male Erudite Enchanter
+#bot create <Name> 14 3 1    -- female Erudite Enchanter
+#bot create <Name> 14 4 0    -- male Wood Elf Enchanter
+#bot create <Name> 14 4 1    -- female Wood Elf Enchanter
+#bot create <Name> 14 5 0    -- male High Elf Enchanter
+#bot create <Name> 14 5 1    -- female High Elf Enchanter
+#bot create <Name> 14 6 0    -- male Dark Elf Enchanter
+#bot create <Name> 14 6 1    -- female Dark Elf Enchanter
+#bot create <Name> 14 7 0    -- male Half Elf Enchanter
+#bot create <Name> 14 7 1    -- female Half Elf Enchanter
+#bot create <Name> 14 8 0    -- male Dwarf Enchanter
+#bot create <Name> 14 8 1    -- female Dwarf Enchanter
+#bot create <Name> 14 9 0    -- male Troll Enchanter
+#bot create <Name> 14 9 1    -- female Troll Enchanter
+#bot create <Name> 14 10 0    -- male Ogre Enchanter
+#bot create <Name> 14 10 1    -- female Ogre Enchanter
+#bot create <Name> 14 11 0    -- male Halfling Enchanter
+#bot create <Name> 14 11 1    -- female Halfling Enchanter
+#bot create <Name> 14 12 0    -- male Gnome Enchanter
+#bot create <Name> 14 12 1    -- female Gnome Enchanter
+#bot create <Name> 14 128 0    -- male Iksar Enchanter
+#bot create <Name> 14 128 1    -- female Iksar Enchanter
+#bot create <Name> 14 130 0    -- male Vah Shir Enchanter
+#bot create <Name> 14 130 1    -- female Vah Shir Enchanter
+
+BEASTLORD - CLASS 15
+#bot create <Name> 15 1 0    -- male Human Beastlord
+#bot create <Name> 15 1 1    -- female Human Beastlord
+#bot create <Name> 15 2 0    -- male Barbarian Beastlord
+#bot create <Name> 15 2 1    -- female Barbarian Beastlord
+#bot create <Name> 15 3 0    -- male Erudite Beastlord
+#bot create <Name> 15 3 1    -- female Erudite Beastlord
+#bot create <Name> 15 4 0    -- male Wood Elf Beastlord
+#bot create <Name> 15 4 1    -- female Wood Elf Beastlord
+#bot create <Name> 15 5 0    -- male High Elf Beastlord
+#bot create <Name> 15 5 1    -- female High Elf Beastlord
+#bot create <Name> 15 6 0    -- male Dark Elf Beastlord
+#bot create <Name> 15 6 1    -- female Dark Elf Beastlord
+#bot create <Name> 15 7 0    -- male Half Elf Beastlord
+#bot create <Name> 15 7 1    -- female Half Elf Beastlord
+#bot create <Name> 15 8 0    -- male Dwarf Beastlord
+#bot create <Name> 15 8 1    -- female Dwarf Beastlord
+#bot create <Name> 15 9 0    -- male Troll Beastlord
+#bot create <Name> 15 9 1    -- female Troll Beastlord
+#bot create <Name> 15 10 0    -- male Ogre Beastlord
+#bot create <Name> 15 10 1    -- female Ogre Beastlord
+#bot create <Name> 15 11 0    -- male Halfling Beastlord
+#bot create <Name> 15 11 1    -- female Halfling Beastlord
+#bot create <Name> 15 12 0    -- male Gnome Beastlord
+#bot create <Name> 15 12 1    -- female Gnome Beastlord
+#bot create <Name> 15 128 0    -- male Iksar Beastlord
+#bot create <Name> 15 128 1    -- female Iksar Beastlord
+#bot create <Name> 15 130 0    -- male Vah Shir Beastlord
+#bot create <Name> 15 130 1    -- female Vah Shir Beastlord
+
+For combination lines, type ONLY the part before --. The text after -- is a label.
+
+SIT AND MEDITATE (added 2026-10-05)
+#bot sit Name on
+#bot sit Name off
+#bot sit all on
+#bot sit all off
+On forces currently spawned bots to sit and stay without following, assisting or casting until released. Owner movement and attacks do not release it. Off restores prior follow/stay mode and normal automatic resting. The response shows Meditate skill and current mana regeneration per tick. Forced sitting resets on dismiss/spawn, zoning and server restart.
+
+DIRECT-DAMAGE CASTING TOGGLE
+#bot dps cast off             Disable nukes for your currently spawned bots
+#bot dps cast on              Enable nukes for your currently spawned bots
+#bot dps cast off Lilly       Disable nukes only for Lilly
+#bot dps cast on Lilly        Enable nukes only for Lilly
+#bot report Lilly            Check the saved setting
+Saved per bot. DoTs (including ones with an initial hit), buffs and heals stay
+allowed. Instant lifetaps and damaging stuns are blocked while OFF. Existing
+spell restrictions still apply. New bots default to ON.

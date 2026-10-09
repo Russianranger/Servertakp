@@ -1,3 +1,4 @@
+#include "player_bot.h"
 /*	EQEMu: Everquest Server Emulator
 Copyright (C) 2001-2002 EQEMu Development Team (http://eqemu.org)
 
@@ -420,7 +421,7 @@ bool Mob::DoCastSpell(uint16 spell_id, uint16 target_id, CastingSlot slot,
 	// and a target wasn't provided, then it's us; unless TGB is on and this
 	// is a TGB compatible spell.
 	if((IsGroupSpell(spell_id) && target_id == 0) ||
-		(spell.targettype == ST_Self && !(IsEffectInSpell(spell_id, SE_Illusion) && IsClient() && CastToClient()->CheckAAEffect(aaEffectProjectIllusion))) ||
+		(spell.targettype == ST_Self && !(IsEffectInSpell(spell_id, SE_Illusion) && ((IsClient() && CastToClient()->CheckAAEffect(aaEffectProjectIllusion)) || PlayerBotProjects(this,spell_id,entity_list.GetMob(target_id))))) ||
 		spell.targettype == ST_UndeadAE ||
 		spell.targettype == ST_SummonedAE ||
 		spell.targettype == ST_AEClientV1 ||
@@ -491,10 +492,10 @@ bool Mob::DoCastSpell(uint16 spell_id, uint16 target_id, CastingSlot slot,
 	{
 		int my_curmana = GetMana();
 		int my_maxmana = GetMaxMana();
-		if(my_curmana < spell.mana)	// not enough mana - note that this checks the base mana cost of the spell not the reduced or magnified MGB cost
+		if(my_curmana < (IsPlayerBot(this)?mana_cost:spell.mana))	// not enough mana - note that this checks the base mana cost of the spell not the reduced or magnified MGB cost
 		{
 			//this is a special case for NPCs with no mana...
-			if(IsNPC() && my_curmana == my_maxmana)
+			if(IsNPC() && !IsPlayerBot(this) && my_curmana == my_maxmana)
 			{
 				mana_cost = 0;
 			} else {
@@ -1391,6 +1392,7 @@ void Mob::CastedSpellFinished(uint16 spell_id, uint32 target_id, CastingSlot slo
 
 	// Check for consumables and Reagent focus items
 	// first check for component reduction
+	if(IsPlayerBot(this) && !ConsumePlayerBotReagents(this,spell_id)) {InterruptSpell();return;}
 	if(IsClient() && RequiresComponents(spell_id) && 
 		(slot != CastingSlot::Item || 
 		(slot == CastingSlot::Item && !CastToClient()->ClickyOverride()))) 
@@ -1754,6 +1756,7 @@ bool Mob::DetermineSpellTargets(uint16 spell_id, Mob *&spell_target, Mob *&ae_ce
 			targetType = ST_ProjectIllusion;
 	}
 
+	if(PlayerBotProjects(this,spell_id,spell_target))targetType=ST_ProjectIllusion;
 	switch (targetType)
 	{
 		// single target spells
@@ -2078,6 +2081,7 @@ bool Mob::SpellFinished(uint16 spell_id, Mob *spell_target, CastingSlot slot, ui
 			range = 100;
 		}
 
+		if(PlayerBotProjects(this,spell_id,spell_target))range=100;
 		LogSpellsDetail("Spell [{}]: Performing second range check.", spell_id);
 
 		//casting a spell on somebody but ourself, make sure they are in range
@@ -2151,6 +2155,7 @@ bool Mob::SpellFinished(uint16 spell_id, Mob *spell_target, CastingSlot slot, ui
 				}
 			}
 
+			PlayerBotProjects(this,spell_id,spell_target,true);
 			if(IsPlayerIllusionSpell(spell_id) && IsClient())
 			{ 
 				if(CastToClient()->CheckAAEffect(aaEffectProjectIllusion))
@@ -2231,8 +2236,14 @@ bool Mob::SpellFinished(uint16 spell_id, Mob *spell_target, CastingSlot slot, ui
 		}
 
 		case GroupSpell:
-		{
-			if (IsClient())
+        {
+            if (IsPlayerBot(this)) {
+                if(PlayerBotMassBuff(this,spell_id))entity_list.MassGroupBuff(this,this,spell_id);
+                else if (auto *group=GetGroup()) group->CastGroupSpell(this,spell_id,isrecourse,recourse_level);
+                else if(auto *raid=GetRaid()) raid->CastGroupSpell(this,spell_id,raid->GetGroup(GetName()),isrecourse,recourse_level);
+                else SpellOnTarget(spell_id,this,false,false,0,isproc,0,isrecourse,recourse_level);
+            }
+            else if (IsClient())
 			{
 				// the casting_spell_id check makes this only work for timed spells, and not autocast recourse spells like Mind Wrack Recourse
 				if (casting_spell_id != 0 && spell_id == casting_spell_id && (casting_aa != 0 || slot != CastingSlot::Item) && IsMGBCompatibleSpell(spell_id) && IsClient() && CastToClient()->CheckAAEffect(aaEffectMassGroupBuff))
@@ -2312,7 +2323,7 @@ bool Mob::SpellFinished(uint16 spell_id, Mob *spell_target, CastingSlot slot, ui
 
 	// if this was a spell slot or an ability use up the mana for it
 	// CastSpell already reduced the cost for it if we're a client with focus
-	if(slot != CastingSlot::Item && (mana_used > 0 || isrecourse))
+	if((slot != CastingSlot::Item || (IsPlayerBot(this) && inventory_slot==0xFFFFFFFF)) && (mana_used > 0 || isrecourse))
 	{
 		if (IsClient())
 		{
@@ -2450,7 +2461,7 @@ int Mob::CalcBuffDuration(Mob *caster, Mob *target, uint16 spell_id, int32 caste
 
 	int res = CalcBuffDuration_formula(castlevel, formula, duration);
 
-	if (caster && caster->IsClient() && IsBeneficialSpell(spell_id) && formula != DF_Permanent)
+	if (caster && (caster->IsClient() || IsPlayerBot(caster)) && IsBeneficialSpell(spell_id) && formula != DF_Permanent)
 	{
 		int aa_bonus = 0;
 		uint8 spell_reinforcement = caster->GetAA(aaSpellCastingReinforcement);
@@ -2484,6 +2495,7 @@ int Mob::CalcBuffDuration(Mob *caster, Mob *target, uint16 spell_id, int32 caste
 		}
 	}
 
+	if(caster && IsPlayerBot(caster) && res>0 && formula!=DF_Permanent && !IsDisc(spell_id))res=caster->GetActSpellDuration(spell_id,res);
 	if (caster == target && (target->aabonuses.IllusionPersistence || target->spellbonuses.IllusionPersistence ||
 				 target->itembonuses.IllusionPersistence) &&
 	    IsEffectInSpell(spell_id, SE_Illusion))
@@ -2813,7 +2825,7 @@ bool Mob::SpellOnTarget(uint16 spell_id, Mob* spelltar, bool reflect, bool use_r
 	}
 
 	// Casting on an entity in a different region silently fails after letting the spell be cast
-	if ((IsClient() || IsPet()) && (!CheckRegion(spelltar) && !IsBindSightSpell(spell_id) && !IsSummonPCSpell(spell_id))) {
+	if ((IsClient() || IsPlayerBot(this) || IsPet()) && (!CheckRegion(spelltar) && !IsBindSightSpell(spell_id) && !IsSummonPCSpell(spell_id))) {
 		if (IsClient() && spelltar->IsClient()) 	{
 			spelltar->Message_StringID(Chat::SpellFailure, StringID::YOU_ARE_PROTECTED, GetName());
 		}
@@ -2870,7 +2882,7 @@ bool Mob::SpellOnTarget(uint16 spell_id, Mob* spelltar, bool reflect, bool use_r
 				if (!WorldContentService::Instance()->IsThePlanesOfPowerEnabled() && spell_id == 250) {
 					is_spell_target_out_of_range = false;
 				}
-				if ((IsClient() && spelltar->IsNPC() && spells[spell_id].max[i] != 0 && is_spell_target_out_of_range) ||
+				if (((IsClient() || IsPlayerBot(this)) && spelltar->IsNPC() && spells[spell_id].max[i] != 0 && is_spell_target_out_of_range) ||
 					spelltar->GetSpecialAbility(SpecialAbility::PacifyImmunity))
 				{
 					spelltar->PacifyImmune = true;
@@ -2937,6 +2949,7 @@ bool Mob::SpellOnTarget(uint16 spell_id, Mob* spelltar, bool reflect, bool use_r
 		}
 	}
 
+	if (!PlayerBotSpellTargetAllowed(this,spelltar,spell_id)) {safe_delete(action_packet);return false;}
 	if(!(IsClient() && CastToClient()->GetGM()) && !IsHarmonySpell(spell_id)) {	// GMs can cast on anything
 		// Beneficial spells check
 		if(IsBeneficialSpell(spell_id)) {
@@ -3400,7 +3413,7 @@ void Corpse::CastRezz(uint16 spellid, Mob* Caster)
 
 	// Rez timer has expired, only GMs can rez at this point. (uses rezzable)
 	if(!IsRezzable()) {
-		if(Caster && Caster->IsClient() && !Caster->CastToClient()->GetGM()) {
+		if(Caster && (IsPlayerBot(Caster) || (Caster->IsClient() && !Caster->CastToClient()->GetGM()))) {
 			Caster->Message_StringID(Chat::White, StringID::REZZ_ALREADY_PENDING);
 			Caster->Message_StringID(Chat::White, StringID::CORPSE_TOO_OLD);
 			return;
@@ -3409,6 +3422,7 @@ void Corpse::CastRezz(uint16 spellid, Mob* Caster)
 
 	// Corpse has been rezzed, but timer is still active. Players can corpse gate, GMs can rez for XP. (uses is_rezzed)
 	if(IsRezzed()) {
+		if(IsPlayerBot(Caster)) rez_experience=0;
 		if(Caster && Caster->IsClient()) {
 			if(Caster->CastToClient()->GetGM()) {
 				rez_experience = gm_rez_experience;
@@ -3637,7 +3651,7 @@ bool Mob::IsImmuneToSpell(uint16 spell_id, Mob *caster, bool isProc)
 		effect_index = GetSpellEffectIndex(spell_id, SE_Mez);
 		assert(effect_index >= 0);
 		// NPCs get to ignore the max level
-		if(GetLevel() > spells[spell_id].max[effect_index] && caster->IsClient() && IsNPC())
+		if(GetLevel() > spells[spell_id].max[effect_index] && (caster->IsClient() || IsPlayerBot(caster)) && IsNPC())
 		{
 			LogSpellsDetail("Our level ([{}]) is higher than the limit of this Mez spell ([{}])", GetLevel(), spells[spell_id].max[effect_index]);
 			caster->Message_StringID(Chat::SpellFailure, StringID::CANNOT_MEZ_WITH_SPELL);
@@ -3709,8 +3723,8 @@ bool Mob::IsImmuneToSpell(uint16 spell_id, Mob *caster, bool isProc)
 			return true;
 		}
 
-		//let npcs cast whatever charm on anyone
-		if(caster->IsClient())
+		// Ordinary NPCs ignore charm level caps; player bots do not.
+		if(caster->IsClient() || IsPlayerBot(caster))
 		{
 			// check level limit of charm spell
 			effect_index = GetSpellEffectIndex(spell_id, SE_Charm);
@@ -3815,7 +3829,7 @@ float Mob::CheckResistSpell(uint8 resist_type, uint16 spell_id, Mob *caster, Mob
 	}
 
 	// SummonedPet is actually the owner Mob
-	Mob* SummonedPet = GetOwner() && !IsCharmedPet() && GetPetType() != petHatelist && caster->IsNPC() ? GetOwner() : nullptr;
+	Mob* SummonedPet = !IsPlayerBot(this) && GetOwner() && !IsCharmedPet() && GetPetType() != petHatelist && caster->IsNPC() && !IsPlayerBot(caster) ? GetOwner() : nullptr;
 	if (!WorldContentService::Instance()->IsTheShadowsOfLuclinEnabled()) {
 		SummonedPet = nullptr;
 	}

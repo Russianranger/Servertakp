@@ -359,12 +359,18 @@ set(gm_command_sources
     gm_commands/zsave.cpp
     gm_commands/zuwcoords.cpp
 )
+list(APPEND gm_command_sources gm_commands/companion.cpp gm_commands/bot.cpp)
 add_library(gm_commands_zone STATIC ${gm_command_sources})
 set_target_properties(gm_commands_zone PROPERTIES UNITY_BUILD ON UNITY_BUILD_BATCH_SIZE 32)
 target_link_libraries(gm_commands_zone PRIVATE rdplib)
 
 # zone combine sources and headers
+list(APPEND zone_sources player_bot.cpp)
 ADD_EXECUTABLE(zone ${zone_sources} ${zone_headers})
+option(PLAYER_BOT_DIAGNOSTICS "Write bounded bot movement traces to /tmp" OFF)
+if(PLAYER_BOT_DIAGNOSTICS)
+  target_compile_definitions(zone PRIVATE PLAYER_BOT_DIAGNOSTICS)
+endif()
 
 # binary output directory
 INSTALL(TARGETS zone RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)

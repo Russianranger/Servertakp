@@ -1,0 +1,39 @@
+TAKP BOT CREATION - QUICK NUMBER GUIDE
+=====================================
+
+COMMAND ORDER
+#bot create Name Class# Race# Gender#
+
+CLASS NUMBERS              RACE NUMBERS
+-------------              ------------
+ 1  Warrior                  1  Human
+ 2  Cleric                   2  Barbarian
+ 3  Paladin                  3  Erudite
+ 4  Ranger                   4  Wood Elf
+ 5  Shadow Knight            5  High Elf
+ 6  Druid                    6  Dark Elf
+ 7  Monk                     7  Half Elf
+ 8  Bard                     8  Dwarf
+ 9  Rogue                    9  Troll
+10  Shaman                  10  Ogre
+11  Necromancer             11  Halfling
+12  Wizard                  12  Gnome
+13  Magician               128  Iksar
+14  Enchanter              130  Vah Shir
+15  Beastlord
+
+GENDER NUMBERS
+--------------
+0 = Male
+1 = Female
+
+Choose class and race independently. Any listed class can use any
+listed race in your installed bot system; rows are NOT required pairings.
+Names must be available and contain 4-15 letters, with no spaces or numbers.
+
+EXAMPLE: FEMALE HIGH ELF CLERIC
+-----------------------------
+#bot create Mercy 2 5 1
+#bot spawn Mercy
+
+2 = Cleric, 5 = High Elf, 1 = Female

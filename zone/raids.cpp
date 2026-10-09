@@ -24,6 +24,7 @@
 #include "groups.h"
 #include "mob.h"
 #include "raids.h"
+#include "player_bot.h"
 #include "string_ids.h"
 
 #include "worldserver.h"
@@ -614,6 +615,10 @@ void Raid::CastGroupSpell(Mob* caster, uint16 spellid, uint32 gid, bool isrecour
 	bool hitcaster = false;
 	for(int x = 0; x < MAX_RAID_MEMBERS; x++)
 	{
+		if(!members[x].member && members[x].GroupNumber==gid && *members[x].membername) {
+			auto *bot=entity_list.GetMob(members[x].membername);
+			if(IsPlayerBot(bot) && bot->GetRaid()==this && DistanceSquared(caster->GetPosition(),bot->GetPosition())<=range2) {caster->SpellOnTarget(spellid,bot,false,false,0,false,0,isrecourse,recourse_level);if(bot==caster)hitcaster=true;}
+		}
 		if(members[x].member && members[x].member == caster) {
 			caster->SpellOnTarget(spellid, caster);
 			hitcaster = true;

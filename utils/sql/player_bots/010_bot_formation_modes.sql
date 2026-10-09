@@ -1,0 +1,3 @@
+ALTER TABLE takp_bot_owner_settings ADD COLUMN IF NOT EXISTS formation_gather TINYINT UNSIGNED NOT NULL DEFAULT 0;
+ALTER TABLE takp_bot_owner_settings ADD COLUMN IF NOT EXISTS formation_line TINYINT UNSIGNED NOT NULL DEFAULT 0;
+INSERT IGNORE INTO takp_bot_schema(version) VALUES(10);
