@@ -47,6 +47,7 @@
 #include "pathfinder_waypoint.h"
 #include "mob_movement_manager.h"
 #include "petitions.h"
+#include "player_bot.h"
 #include "quest_parser_collection.h"
 #include "spawn2.h"
 #include "spawngroup.h"
@@ -742,6 +743,14 @@ void Zone::Shutdown(bool quiet)
 	}
 
 	entity_list.StopMobAI();
+
+	// Persist companions while their owners, group state and zone data are still
+	// available. Client destruction below happens after is_zone_loaded is cleared.
+	for (const auto &entry : entity_list.GetClientList()) {
+		if (entry.second->ClientDataLoaded()) {
+			SavePlayerBots(entry.second);
+		}
+	}
 
 	std::map<uint32,NPCType *>::iterator itr;
 	while(!zone->npctable.empty()) {

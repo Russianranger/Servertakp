@@ -56,6 +56,7 @@
 #include "guild_mgr.h"
 #include "mob.h"
 #include "petitions.h"
+#include "player_bot.h"
 #include "pets.h"
 #include "queryserv.h"
 #include "quest_parser_collection.h"
@@ -569,6 +570,7 @@ void Client::CompleteConnect()
 	// entity_list.SendZoneAppearance(this);
 
 	client_data_loaded = true;
+	RestorePlayerBots(this);
 
 	UpdateActiveLight();
 	SendAppearancePacket(AppearanceType::Light, GetActiveLightType());
@@ -8297,6 +8299,22 @@ void Client::Handle_OP_TradeAcceptClick(const EQApplicationPacket *app)
 			CancelTradeSession(GetID());
 		return;
 	}
+	if (IsPlayerBot(with))
+	{
+		// Keep the current packet/session validation before the bot transaction.
+		// Bot trades exchange equipment and refund every offered coin.
+		trade->state = TradeCompleting;
+		if (FinishPlayerBotTrade(this, with))
+		{
+			trade->Reset();
+			with->trade->Reset();
+			EQApplicationPacket finish(OP_FinishTrade, 0);
+			QueuePacket(&finish);
+			EQApplicationPacket reset(OP_TradeReset, 0);
+			QueuePacket(&reset);
+		}
+		return;
+	}
 	if (with->IsClient())
 	{
 		Client* other = with->CastToClient();
@@ -8557,6 +8575,12 @@ void Client::Handle_OP_TradeRequest(const EQApplicationPacket *app)
 	Mob* other = entity_list.GetMob(msg->target);
 	if (!other || (!other->IsClient() && !other->IsNPC()))
 		return;
+	if (IsPlayerBot(other) && !CanTradePlayerBot(this, other))
+	{
+		Message(Chat::White, "You may trade equipment only with your own nearby bot while out of combat.");
+		SendCancelTrade(other);
+		return;
+	}
 	CommonBreakInvisible(true);
 	if (other->IsClient()) {
 		if (IsFeigned())

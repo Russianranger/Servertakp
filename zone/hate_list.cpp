@@ -1,3 +1,4 @@
+#include "player_bot.h"
 /*	EQEMu: Everquest Server Emulator
 	Copyright (C) 2001-2002 EQEMu Development Team (http://eqemu.org)
 
@@ -185,9 +186,10 @@ int32 HateList::GetEntPetDamage(Mob* ent)
 	{
 		m = (*iterator)->ent;
 
-		if (m->IsNPC() && (m->IsPet() || m->CastToNPC()->GetSwarmInfo()))
+		if (m->IsNPC() && (m->IsPet() || IsPlayerBot(m) || m->CastToNPC()->GetSwarmInfo()))
 		{
 			pet_owner = m->GetOwner();
+			if (IsPlayerBot(pet_owner)) pet_owner=pet_owner->GetOwner();
 			swarm_info = m->CastToNPC()->GetSwarmInfo();
 			
 			if ((pet_owner && pet_owner == ent) || (swarm_info && swarm_info->GetOwner() && swarm_info->GetOwner() == ent))
@@ -300,7 +302,7 @@ Mob* HateList::GetDamageTop(int32& return_dmg, bool combine_pet_dmg, bool client
 		}
 		else if (m->IsNPC())
 		{
-			if (m->GetOwner() && m->GetOwner()->IsClient())
+			if ((m->GetOwner() && m->GetOwner()->IsClient()) || IsPlayerBotPet(m))
 			{
 				// player pets
 
@@ -824,7 +826,7 @@ Mob *HateList::GetTop()
 		if (isInMeleeRange)
 		{
 			mobInMeleeRange = true;
-			if (cur->ent->IsClient())
+			if (cur->ent->IsClient() || IsPlayerBot(cur->ent))
 				clientInMeleeRange = true;
 		}
 
@@ -855,7 +857,7 @@ Mob *HateList::GetTop()
 			currentHate = 0;
 		}
 
-		if (cur->ent->IsClient())
+		if (cur->ent->IsClient() || IsPlayerBot(cur->ent))
 		{
 			if (currentHate > topClientHate)
 			{

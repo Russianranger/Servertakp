@@ -1,3 +1,4 @@
+#include "player_bot.h"
 /*	EQEMu: Everquest Server Emulator
 	Copyright (C) 2001-2002 EQEMu Development Team (http://eqemulator.net)
 
@@ -557,6 +558,8 @@ int Mob::CalcMeleeDamage(Mob* defender, int baseDamage, EQ::skills::SkillType sk
 
 	if (IsClient())
 		CastToClient()->RollDamageMultiplier(offense, damage, skill);
+	else if(IsPlayerBot(this))
+		ApplyPlayerBotDamageMultiplier(this,offense,damage,skill);
 
 	return damage;
 }
@@ -1753,6 +1756,7 @@ bool NPC::Death(Mob* killer_mob, int32 damage, uint16 spell, EQ::skills::SkillTy
 	uint16 OrigEntID = this->GetID();
 	// oos is the non-pet Mob who dealt the deathblow. 
 	Mob *owner_or_self = killer_mob ? killer_mob->GetOwnerOrSelf() : nullptr;
+	if (IsPlayerBot(owner_or_self)) owner_or_self=owner_or_self->GetOwner();
 	bool skip_corpse_checks = false;
 	bool ismerchant = class_ == Class::Merchant || MerchantType > 0;
 	bool player_damaged = ds_damage + npc_damage < total_damage;
@@ -2292,6 +2296,9 @@ void Mob::AddToHateList(Mob* other, int32 hate, int32 damage, bool bFrenzy, bool
 		return;
 
 	Mob* owner = other->GetOwner();
+	// A bot's summoned/charmed pet has two ownership links. Put the player
+	// on the hate list as well so combined pet damage can award XP and loot.
+	if(IsPlayerBot(owner)) owner=owner->GetOwner();
 	Mob* mypet = this->GetPet();
 	Mob* myowner = this->GetOwner();
 	Mob* targetmob = this->GetTarget();
@@ -2839,7 +2846,7 @@ void Mob::CommonDamage(Mob* attacker, int32 &damage, const uint16 spell_id, cons
 				if(attacker->IsDireCharmed())
 					dire_pet_damage += adj_damage;
 
-				if (attacker->IsNPC() && (!attacker->IsPet() || (attacker->GetOwner() && attacker->GetOwner()->IsNPC())))
+				if (attacker->IsNPC() && !IsPlayerBot(attacker) && !IsPlayerBotPet(attacker) && (!attacker->IsPet() || (attacker->GetOwner() && attacker->GetOwner()->IsNPC())))
 					npc_damage += adj_damage;
 
 				if (IsValidSpell(spell_id) && spells[spell_id].targettype == ST_AECaster)
@@ -3563,7 +3570,7 @@ void Mob::TryCriticalHit(Mob *defender, uint16 skill, int32 &damage, int32 minBa
 	}
 
 	//2: Try Melee Critical
-	if (IsClient())
+	if (IsClient() || IsPlayerBot(this))
 	{
 		// Combat Fury and Fury of the Ages AAs
 		int critChanceMult = aabonuses.CriticalHitChance;
@@ -3597,7 +3604,7 @@ void Mob::TryCriticalHit(Mob *defender, uint16 skill, int32 &damage, int32 minBa
 			critChance += critChance * static_cast<float>(critChanceMult) / 100.0f;
 
 		// this is cleaner hardcoded due to the way bonuses work and holyforge crit rate is a max()
-		uint8 activeDisc = CastToClient()->GetActiveDisc();
+		uint8 activeDisc = IsClient()?CastToClient()->GetActiveDisc():PlayerBotDiscipline(this);
 
 		if (activeDisc == disc_defensive)
 			critChance = 0.0f;
@@ -3691,7 +3698,7 @@ void Mob::TryCriticalHit(Mob *defender, uint16 skill, int32 &damage, int32 minBa
 	}
 
 	// Discs
-	if (defender && IsClient() && CastToClient()->HasInstantDisc(skill))
+	if (defender && ((IsClient() && CastToClient()->HasInstantDisc(skill)) || PlayerBotInstantDisc(this,skill)))
 	{
 		if (damage > 0)
 		{
@@ -3723,7 +3730,7 @@ void Mob::TryCriticalHit(Mob *defender, uint16 skill, int32 &damage, int32 minBa
 
 		if (damage != DMG_MISS)
 		{
-			CastToClient()->FadeDisc();
+			if(IsClient())CastToClient()->FadeDisc();else PlayerBotInstantDisc(this,skill,true);
 		}
 	}
 }

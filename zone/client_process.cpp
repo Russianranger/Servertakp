@@ -45,6 +45,7 @@
 #include "guild_mgr.h"
 #include "map.h"
 #include "petitions.h"
+#include "player_bot.h"
 #include "queryserv.h"
 #include "quest_parser_collection.h"
 #include "string_ids.h"
@@ -616,7 +617,12 @@ void Client::FinishDisconnect()
 	client_state = DISCONNECTED;
 
 	if (ClientDataLoaded())
+	{
+		// Persist and detach companions before the current zoning/logout path
+		// removes the owner's group, raid, and transport session.
+		SavePlayerBots(this);
 		Save();
+	}
 
 	WorldSessionStatus world_status = WorldSessionStatus::Offline;
 	if (m_removal_disposition == ClientRemovalDisposition::ZoneTransfer)

@@ -1,0 +1,75 @@
+name: Player bot qualification
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: player-bots-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Full server and bot tests (${{ matrix.architecture }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            architecture: x86_64
+          - runner: ubuntu-24.04-arm
+            architecture: aarch64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install compiler and server dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build python3 file \
+            libboost-dev libmariadb-dev libssl-dev zlib1g-dev \
+            liblua5.1-0-dev libluabind-dev libsodium-dev libperl-dev uuid-dev
+      - name: Standalone player bot regressions
+        run: python3 tests/player-bots/run.py
+      - name: Full native server build
+        env:
+          EXPECTED_MACHINE: ${{ matrix.architecture }}
+          BUILD_JOBS: 2
+        run: bash scripts/validation/build-server.sh build/validation
+      - name: Preserve build logs and binaries
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: takp-player-bots-${{ matrix.architecture }}-${{ github.sha }}
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            build/validation/server-binaries-*.tar.gz
+            build/validation/*.log
+            build/validation/*.ldd.txt
+            build/validation/source-commit.txt
+            build/validation/source-status.txt
+            build/validation/architecture.txt
+            build/validation/CMakeCache.txt
+
+  migrations:
+    name: Disposable database migration regressions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install MariaDB
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends mariadb-server mariadb-client python3
+          sudo systemctl start mariadb
+      - name: Test isolated migration databases
+        run: sudo python3 tests/player-bots/database.py --client-arg=--user=root

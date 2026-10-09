@@ -27,6 +27,7 @@
 #include "corpse.h"
 #include "entity.h"
 #include "mob.h"
+#include "player_bot.h"
 
 #include "map.h"
 #include "water_map.h"
@@ -918,6 +919,7 @@ faster, but I'm doing it this way to make it readable and easy to modify
 
 bool Mob::IsAttackAllowed(Mob *target, bool isSpellAttack, int16 spellid)
 {
+	if(IsPlayerBotPet(this)) return GetOwner()->IsAttackAllowed(target,isSpellAttack,spellid);
 
 	Mob *mob1 = nullptr, *mob2 = nullptr, *tempmob = nullptr;
 	Client *c1 = nullptr, *c2 = nullptr, *becomenpc = nullptr;

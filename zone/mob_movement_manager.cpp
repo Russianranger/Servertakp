@@ -1,6 +1,8 @@
 #include "mob_movement_manager.h"
 #include "client.h"
 #include "mob.h"
+#include "player_bot.h"
+#include "player_bot_follow.h"
 #include "zone.h"
 #include "position.h"
 #include "water_map.h"
@@ -216,6 +218,20 @@ public:
 			current_speed = 0;
 		}
 
+        // Player animation speed is an integer in tenths: round the physical
+        // NPC-unit speed to the equivalent representable player speed as well.
+        if (IsPlayerBot(mob) && current_speed > 0) {
+            current_speed = PlayerBotFollowPace(mob, std::max(8, ((current_speed + 4) / 8) * 8));
+            current_float_speed = current_speed * 0.025f;
+        }
+        // Encode the velocity corresponding to the physical path speed. Bots use
+        // player-model packets but NPC movement; halving NPC speed under-reports motion.
+        if (IsPlayerBot(mob)) {
+            const glm::vec3 direction = glm::vec3(m_move_to_x, m_move_to_y, m_move_to_z) - glm::vec3(mob->GetPosition());
+            const float horizontal = glm::length(glm::vec2(direction));
+            const glm::vec3 velocity = horizontal > 0.01f ? direction * (BotFollow::PacketVelocity(current_speed) / horizontal) : glm::vec3(0.0f);
+            mob->SetDelta(glm::vec4(velocity, 0.0f));
+        }
 		mob->SetRunAnimation(current_float_speed);
 
 		if (mob->IsClient())
@@ -239,7 +255,12 @@ public:
 			m_total_h_dist    = DistanceNoZ(mob->GetPosition(), glm::vec4(m_move_to_x, m_move_to_y, 0.0f, 0.0f));
 			m_total_v_dist    = m_move_to_z - mob->GetZ();
 			m_last_sent_speed = current_speed;
-			if (!currently_moving || (currently_moving && current_speed == 0) || cur_head != mob->GetHeading()) {
+			if (IsPlayerBot(mob)) {
+                // Publish after this frame's step, like ongoing updates. Sending
+                // the previous frame's position here makes clients rewind on
+                // every follow-path recalculation.
+                need_update = true;
+            } else if (!currently_moving || (currently_moving && current_speed == 0) || cur_head != mob->GetHeading()) {
 				m_last_sent_time = current_time;
 				if (RuleB(Map, FixZWhenPathing)) {
 					m_distance_moved_since_correction = 0.0;
@@ -247,16 +268,17 @@ public:
 				}
 				mob->SendPosUpdate();
 				mob->SendPosUpdate(2);
-				return false;
+                // A new follow destination must not pause an already moving bot.
+                if (!IsPlayerBot(mob)) return false;
 			}
 		}
 		if (m_last_sent_speed > 0.0f)
 			mob->SetMoved(true);
 
-		double    distance_moved = frame_time * static_cast<double>(m_last_sent_speed) * 0.4f * 1.45f;
+		double    distance_moved = frame_time * static_cast<double>(IsPlayerBot(mob) ? current_speed : m_last_sent_speed) * 0.4f * 1.45f;
 
 		//When speed changes
-		if (current_speed != m_last_sent_speed || mob_speed != current_float_speed) {
+		if (current_speed != m_last_sent_speed || (!IsPlayerBot(mob) && mob_speed != current_float_speed)) {
 			need_update = true;
 		}
 		m_total_h_dist_moved += distance_moved;
@@ -297,7 +319,7 @@ public:
 			}
 		}
 		//If x seconds have passed without sending an update.
-		if ((m_distance_moved_since_correction > 0.0 || mob->IsClient()) && ((current_time - m_last_sent_time) >= 2.0))
+		if ((m_distance_moved_since_correction > 0.0 || mob->IsClient()) && ((current_time - m_last_sent_time) >= (IsPlayerBot(mob) ? 0.2 : 2.0)))
 			need_update = true;
 
 		if ((need_update) || (m_distance_moved_since_correction > 10.0)) {
@@ -396,11 +418,26 @@ public:
 			current_speed = 0;
 		}
 
+        // Player animation speed is an integer in tenths: round the physical
+        // NPC-unit speed to the equivalent representable player speed as well.
+        if (IsPlayerBot(mob) && current_speed > 0) {
+            current_speed = PlayerBotFollowPace(mob, std::max(8, ((current_speed + 4) / 8) * 8));
+            current_float_speed = current_speed * 0.025f;
+        }
+        // Encode the velocity corresponding to the physical path speed. Bots use
+        // player-model packets but NPC movement; halving NPC speed under-reports motion.
+        if (IsPlayerBot(mob)) {
+            const glm::vec3 direction = glm::vec3(m_move_to_x, m_move_to_y, m_move_to_z) - glm::vec3(mob->GetPosition());
+            const float horizontal = glm::length(glm::vec2(direction));
+            const glm::vec3 velocity = horizontal > 0.01f ? direction * (BotFollow::PacketVelocity(current_speed) / horizontal) : glm::vec3(0.0f);
+            mob->SetDelta(glm::vec4(velocity, 0.0f));
+        }
 		mob->SetRunAnimation(current_float_speed);
 
 		if (mob->IsClient())
 			current_speed *= 2;
 
+		bool need_update = false;
 		if (!m_started) {
 			m_started = true;
 			//rotate to the point
@@ -412,21 +449,26 @@ public:
 			m_last_sent_time  = current_time;
 			m_total_h_dist    = DistanceNoZ(mob->GetPosition(), glm::vec4(m_move_to_x, m_move_to_y, 0.0f, 0.0f));
 			m_total_v_dist    = m_move_to_z - mob->GetZ();
-			mob->SendPosUpdate();
-			mob->SendPosUpdate(2);
-			return false;
+			if(IsPlayerBot(mob)) need_update = true;
+            else {
+                mob->SendPosUpdate();
+                mob->SendPosUpdate(2);
+                return false;
+            }
 		}
 
 		//When speed changes
-		if (current_speed != m_last_sent_speed || mob_speed != current_float_speed) {
+		if (current_speed != m_last_sent_speed || (!IsPlayerBot(mob) && mob_speed != current_float_speed)) {
 			m_distance_moved_since_correction = 0.0;
 			m_last_sent_speed = current_speed;
 			m_last_sent_time  = current_time;
-			mob->SendPosUpdate();
-			mob->SendPosUpdate(2);
+			if(IsPlayerBot(mob)) need_update = true;
+            else {
+                mob->SendPosUpdate();
+                mob->SendPosUpdate(2);
+            }
 		}
 
-		bool need_update = false;
 		auto      &p  = mob->GetPosition();
 		glm::vec2 tar(m_move_to_x, m_move_to_y);
 		glm::vec2 pos(p.x, p.y);
@@ -465,7 +507,7 @@ public:
 			m_distance_moved_since_correction += distance_moved;
 		}
 		//If x seconds have passed without sending an update.
-		if ((current_time - m_last_sent_time >= 2.0) && (mob->IsClient() || (m_distance_moved_since_correction > 0.0))) {
+		if (need_update || ((current_time - m_last_sent_time >= (IsPlayerBot(mob) ? 0.2 : 2.0)) && (mob->IsClient() || (m_distance_moved_since_correction > 0.0)))) {
 			m_distance_moved_since_correction = 0.0;
 			m_last_sent_speed = current_speed;
 			m_last_sent_time = current_time;
@@ -547,6 +589,20 @@ public:
 			current_speed = 0;
 		}
 
+        // Player animation speed is an integer in tenths: round the physical
+        // NPC-unit speed to the equivalent representable player speed as well.
+        if (IsPlayerBot(mob) && current_speed > 0) {
+            current_speed = PlayerBotFollowPace(mob, std::max(8, ((current_speed + 4) / 8) * 8));
+            current_float_speed = current_speed * 0.025f;
+        }
+        // Encode the velocity corresponding to the physical path speed. Bots use
+        // player-model packets but NPC movement; halving NPC speed under-reports motion.
+        if (IsPlayerBot(mob)) {
+            const glm::vec3 direction = glm::vec3(m_move_to_x, m_move_to_y, m_move_to_z) - glm::vec3(mob->GetPosition());
+            const float horizontal = glm::length(glm::vec2(direction));
+            const glm::vec3 velocity = horizontal > 0.01f ? direction * (BotFollow::PacketVelocity(current_speed) / horizontal) : glm::vec3(0.0f);
+            mob->SetDelta(glm::vec4(velocity, 0.0f));
+        }
 		mob->SetRunAnimation(current_float_speed);
 
 		if (mob->IsClient())
@@ -571,20 +627,23 @@ public:
 			m_total_h_dist = DistanceNoZ(mob->GetPosition(), glm::vec4(m_move_to_x, m_move_to_y, 0.0f, 0.0f));
 			m_total_v_dist = m_move_to_z - mob->GetZ();
 			m_last_sent_speed = current_speed;
-			if (!currently_moving || (currently_moving && current_speed == 0)) {
+			if(IsPlayerBot(mob)) {
+                need_update = true;
+            } else if (!currently_moving || (currently_moving && current_speed == 0)) {
 				m_last_sent_time = current_time;
 				mob->SendPosUpdate();
 				mob->SendPosUpdate(2);
-				return false;
+                // A new follow destination must not pause an already moving bot.
+                if (!IsPlayerBot(mob)) return false;
 			}
 		}
 		if (m_last_sent_speed > 0)
 			mob->SetMoved(true);
 
-		double    distance_moved = frame_time * static_cast<double>(m_last_sent_speed) * 0.4f * 1.45f;
+		double    distance_moved = frame_time * static_cast<double>(IsPlayerBot(mob) ? current_speed : m_last_sent_speed) * 0.4f * 1.45f;
 
 		//When speed changes
-		if (current_speed != m_last_sent_speed || mob_speed != current_float_speed) {
+		if (current_speed != m_last_sent_speed || (!IsPlayerBot(mob) && mob_speed != current_float_speed)) {
 			need_update = true;
 		}
 		m_total_h_dist_moved += distance_moved;
@@ -616,7 +675,7 @@ public:
 
 		}
 		//If x seconds have passed without sending an update.
-		if ((m_distance_moved_since_correction > 0.0 || mob->IsClient()) && ((current_time - m_last_sent_time) >= 2.0))
+		if ((m_distance_moved_since_correction > 0.0 || mob->IsClient()) && ((current_time - m_last_sent_time) >= (IsPlayerBot(mob) ? 0.2 : 2.0)))
 			need_update = true;
 
 		if (need_update) {
@@ -889,6 +948,7 @@ void MobMovementManager::Process()
 
 		while (true != commands.empty()) {
 			auto &cmd = commands.front();
+            const auto before = iter.first->GetPosition();
 			auto r    = cmd->Process(this, iter.first);
 
 			if (true != r) {
@@ -896,7 +956,18 @@ void MobMovementManager::Process()
 			}
 
 			commands.pop_front();
+            // A completed waypoint already consumed this frame's movement.
+            // Start the next segment next frame, without taking a second full step.
+            if (IsPlayerBot(iter.first) && glm::distance(glm::vec3(before), glm::vec3(iter.first->GetPosition())) > 0.001f) break;
 		}
+        // NPC AI normally stops on its next think tick. A player-facing bot must
+        // cancel extrapolation as soon as the final path segment is consumed.
+        if (IsPlayerBot(iter.first) && commands.empty() && iter.first->IsMoving()) {
+            iter.first->SetMoving(false);
+            iter.first->SetMoved(false);
+            iter.first->SetRunAnimation(0.0f);
+            iter.first->SendRealPosition();
+        }
 	}
 }
 
@@ -998,12 +1069,14 @@ void MobMovementManager::NavigateTo(Mob *who, float x, float y, float z, MobMove
 	double current_time = static_cast<double>(Timer::GetCurrentTime()) / 1000.0;
 	float current_speed = who->GetCurrentSpeed();
 	bool speed_changed = (who->GetCurrentSpeed() != nav.navigate_to_speed) || (mode != nav.navigate_to_mode);
-	if ((current_time - nav.last_set_time) > 0.5 || speed_changed || ((ent.second.Commands.size() < 2) && (current_time - nav.last_set_time) > 0.2)) {
+	if ((current_time - nav.last_set_time) > (IsPlayerBot(who) ? 0.2 : 0.5) || speed_changed || (!IsPlayerBot(who) && (ent.second.Commands.size() < 2) && (current_time - nav.last_set_time) > 0.2)) {
 		//Can potentially recalc
 		auto within = IsPositionWithinSimpleCylinder(
 			glm::vec3(x, y, z),
 			glm::vec3(nav.navigate_to_x, nav.navigate_to_y, nav.navigate_to_z),
-			1.5f,
+            // Keep a small deadband for player coordinate corrections; follow
+            // destinations can refresh promptly as the owner moves.
+            IsPlayerBot(who) ? 0.75f : 1.5f,
 			6.0f
 		);
 
@@ -1348,7 +1421,20 @@ void MobMovementManager::UpdatePathGround(Mob *who, float x, float y, float z, M
 			);
 			return;
 		}
-		if (!(last_x == 0.0f && last_y != 0.0f && last_z != 0.0f)) {
+        if (IsPlayerBot(who) && !(last_x == 0.0f && last_y == 0.0f && last_z == 0.0f)) {
+            // Retargeting a moving owner can prepend mesh vertices behind us.
+            // If our current waypoint is still in the new route, retain it as
+            // the next corner instead of restarting from those earlier vertices.
+            auto next = std::next(route.begin());
+            auto corner = next;
+            int checked = 0;
+            for (; corner != route.end() && checked < 5; ++corner, ++checked) {
+                if (!corner->teleport && glm::distance(corner->pos, glm::vec3(last_x,last_y,last_z)) < 0.1f) break;
+            }
+            if (corner != route.end() && checked < 5) route.erase(next, corner);
+        }
+        // Preserve the legacy route handling for ordinary NPCs.
+        if (!IsPlayerBot(who) && !(last_x == 0.0f && last_y != 0.0f && last_z != 0.0f)) {
 			// if one of points in our route may be where we are already heading
 			if (last_x != x && last_y != y) {
 				routeNode = route.begin();

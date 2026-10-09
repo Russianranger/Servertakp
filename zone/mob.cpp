@@ -26,6 +26,7 @@
 #include "string_ids.h"
 #include "worldserver.h"
 #include "mob_movement_manager.h"
+#include "player_bot.h"
 
 #include <limits.h>
 #include <math.h>
@@ -1233,7 +1234,13 @@ void Mob::SendPosUpdate(uint8 iSendToSelf)
 		spu->num_updates = 1; // hack - only one spawn position per update
 		MakeSpawnUpdate(&spu->spawn_update);
 
-		if (IsClient())
+		if (IsPlayerBot(this)) {
+            // Player-facing bots need their initial movement update even before
+            // the periodic NPC proximity cache marks their spawn as inside.
+            entity_list.QueueClientsPosUpdate(this, app, true, false);
+            NotePlayerBotMovementPacket(this);
+        }
+        else if (IsClient())
 		{
 			if (CastToClient()->gmhideme)
 				entity_list.QueueClientsStatus(this, app, (iSendToSelf == 0), CastToClient()->Admin(), 255, false);
@@ -1255,7 +1262,7 @@ void Mob::MakeSpawnUpdateNoDelta(SpawnPositionUpdate_Struct *spu)
 
 	spu->spawn_id	= GetID();
 	spu->x_pos = static_cast<int16>(m_Position.x);
-	spu->y_pos = static_cast<int16>(m_Position.y);
+    spu->y_pos = static_cast<int16>(m_Position.y);
 	spu->z_pos = static_cast<int16>(m_Position.z * 10.0f);
 	spu->heading	= static_cast<int8>(m_Position.w);
 
@@ -1263,6 +1270,7 @@ void Mob::MakeSpawnUpdateNoDelta(SpawnPositionUpdate_Struct *spu)
 	spu->delta_heading = 0;
 
 	spu->anim_type	= 0;
+	if(IsPlayerBot(this)) TracePlayerBotPacket(this,spu,true);
 
 	/*
 	if(IsNPC()) 
@@ -1286,11 +1294,15 @@ void Mob::MakeSpawnUpdate(SpawnPositionUpdate_Struct* spu)
 
 	spu->spawn_id	= GetID();
 	spu->x_pos = static_cast<int16>(m_Position.x);
-	spu->y_pos = static_cast<int16>(m_Position.y);
+    spu->y_pos = static_cast<int16>(m_Position.y);
 	spu->z_pos = static_cast<int16>(m_Position.z * 10.0f);
 	spu->heading	= static_cast<int8>(m_Position.w);
 
-	spu->delta_yzx.SetValue(m_Delta.x, m_Delta.y, IsNPC() ? 0.0f : m_Delta.z);
+	if (IsPlayerBot(this) && !IsMoving()) {
+        spu->delta_yzx.value = 0;
+    } else {
+        spu->delta_yzx.SetValue(m_Delta.x, m_Delta.y, (IsNPC() && !IsPlayerBot(this)) ? 0.0f : m_Delta.z);
+    }
 	spu->delta_heading = static_cast<int8>(m_Delta.w);
 
 	if(this->IsClient() || this->iszomm)
@@ -1299,8 +1311,9 @@ void Mob::MakeSpawnUpdate(SpawnPositionUpdate_Struct* spu)
 	}
 	else if(this->IsNPC())
 	{
-		spu->anim_type = pRunAnimSpeed;
+		spu->anim_type = IsPlayerBot(this) ? (IsMoving() ? pRunAnimSpeed / 2 : 0) : pRunAnimSpeed;
 	}
+	if(IsPlayerBot(this)) TracePlayerBotPacket(this,spu,false);
 }
 
 void Mob::SetSpawnUpdate(SpawnPositionUpdate_Struct* incoming, SpawnPositionUpdate_Struct* outgoing) 

@@ -54,5 +54,9 @@ bin/
 /x64
 /client_files/**/CMakeFiles/
 *.bak
+
+# Python validation helpers
+__pycache__/
+*.pyc
 /utils/TaskMaster/.vs/
 /utils/TaskMaster/Debug/
