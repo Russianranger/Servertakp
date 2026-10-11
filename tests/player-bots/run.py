@@ -10,4 +10,5 @@ with tempfile.TemporaryDirectory(prefix='takp-bot-tests-') as tmp:
         print(source.name, flush=True)
         subprocess.run(compiler + ['-std=c++20', '-I', str(root/'zone'), str(source), '-o', str(binary)], check=True)
         subprocess.run([str(binary)], check=True)
+subprocess.run([os.environ.get('PYTHON', 'python3'), str(Path(__file__).parent/'yaulp_spell_tests.py')], check=True)
 print('All standalone bot test programs passed.')

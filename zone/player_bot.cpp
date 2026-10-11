@@ -299,6 +299,7 @@ public:
  void ListDepartures();
  bool Evacuate();
  bool HealTarget(Mob *target);
+ bool CastCombatBuff();
  void LoadClassSpells();
  void LoadEquipment();
  bool LoadFeatures();
@@ -499,6 +500,7 @@ void PlayerBot::LoadClassSpells()
  }
  std::sort(ids.begin(),ids.end(),[&](int a,int b){return spells[a].classes[GetClass()-1]<spells[b].classes[GetClass()-1];});
  for(int id:ids) {
+  const auto &s=spells[id];
   uint16 kind=0;
   if(IsHealingSpell(id) && !IsDamageSpell(id)) kind=SpellType_Heal;
   else if(IsSlowSpell(id)) kind=SpellType_Slow;
@@ -508,7 +510,13 @@ void PlayerBot::LoadClassSpells()
   else if(IsPureNukeSpell(id)) kind=SpellType_Nuke;
   else if(IsLifetapSpell(id)) kind=SpellType_Lifetap;
   else if(IsBeneficialSpell(id) && !IsInvulnerabilitySpell(id) &&
-   (IsHasteSpell(id) || IsEffectInSpell(id,SE_ArmorClass) || IsEffectInSpell(id,SE_TotalHP) || IsEffectInSpell(id,SE_ATK))) kind=SpellType_Buff;
+   (IsHasteSpell(id) || IsEffectInSpell(id,SE_ArmorClass) || IsEffectInSpell(id,SE_TotalHP) || IsEffectInSpell(id,SE_ATK))) {
+   // Yaulp's native ranks are short self buffs, including the later mana/haste
+   // ranks. Maintaining them while idle repeatedly interrupts meditation.
+   // Classify from this server's spell data rather than modern spell IDs.
+   kind=GetClass()==Class::Cleric && s.targettype==ST_Self &&
+        s.buffduration>0 && s.buffduration<=4 ? SpellType_InCombatBuff : SpellType_Buff;
+  }
   if(kind) AddSpellToNPCList(1,id,kind,-1,-1,spells[id].ResistDiff);
  }
  std::sort(utility_spells_.begin(),utility_spells_.end(),[&](int a,int b){return spells[a].classes[GetClass()-1]<spells[b].classes[GetClass()-1];});
@@ -533,6 +541,20 @@ bool PlayerBot::HealTarget(Mob *target)
  return false;
 }
 
+bool PlayerBot::CastCombatBuff()
+{
+ for(int i=static_cast<int>(AIspells.size())-1;i>=0;--i) {
+  const auto &entry=AIspells[i]; const auto &spell=spells[entry.spellid];
+  if(entry.type!=SpellType_InCombatBuff || i>255 || spell.targettype!=ST_Self) continue;
+  if(entry.time_cancast>Timer::GetCurrentTime() || GetActSpellCost(entry.spellid,spell.mana)>GetMana()) continue;
+  if(IsImmuneToSpell(entry.spellid,this) || CanBuffStack(entry.spellid,GetLevel(),true)<0) continue;
+  // A rejected/disabled spell must not consume this AI opportunity. CastSpell
+  // retains the per-bot permissions and native successful-cast recast timer.
+  if(AIDoSpellCast(i,this,spell.mana)) return true;
+ }
+ return false;
+}
+
 bool PlayerBot::CastClassSpells(bool combat)
 {
  if(IsCasting() || !spell_timer_.Check() || !Owner() || options_["suspend"]) return false;
@@ -549,8 +571,10 @@ bool PlayerBot::CastClassSpells(bool combat)
   for(size_t n=0;n<songs_.size();++n){auto id=songs_[next_song_++%songs_.size()];auto *target=IsBeneficialSpell(id)?static_cast<Mob*>(this):GetTarget();if(target&&TrySpell(id,target))return true;}
  }
  if(!combat && pet_enabled_ && !GetPet() && Utility("pet",this)) return true;
- if(combat && stance_ && Allowed(GetTarget()))
+ if(combat && stance_ && Allowed(GetTarget())) {
+  if(CombatRange(GetTarget()) && CastCombatBuff()) return true;
   return AICastSpell(GetTarget(),100,SpellType_Slow|SpellType_DOT|SpellType_Nuke|SpellType_Lifetap|SpellType_Snare);
+ }
  if(!combat || GetClass()==Class::Bard) {
   if(AICastSpell(Owner(),100,SpellType_Buff)) return true;
   for(auto *m:Friends()) if(m && AICastSpell(m,100,SpellType_Buff)) return true;
